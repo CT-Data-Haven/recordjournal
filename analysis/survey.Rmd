@@ -1,100 +1,32 @@
-### CANNOT!! just update this bc denoms are hard coded
+---
+title: "Survey summaries"
+output: github_document
+---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F)
+```
+
+```{r}
 library(tidyverse)
-library(tidycensus)
 library(cwi)
-library(stylehaven)
-library(showtext)
+source("../utils/plot_utils.R")
+```
 
-showtext_auto()
-showtext_opts(dpi = 150)
+**Cannot just re-run this! some denoms are hard-coded for non-response, and there's some text mining**
 
-font_add_weights("Barlow Semi Condensed", semibold = 500)
+```{r}
+path <- "../survey_data/05162022/"
+plot_path <- "../distro/"
+```
 
-base_col <- "#5e3da7"
-
-palx_colors <- palx(base_col, n_shades = 5, plot = F)
-
-qual_pal <- palx_colors$shade03
-opinion_pal <- c(palx_colors$shade02[["violet"]], palx_colors$shade03[["violet"]], palx_colors$shade04[["violet"]])
-
-tf_pal <- c("TRUE" = palx_colors[["shade02"]][["gray"]], "FALSE" = palx_colors[["shade05"]][["gray"]])
-
-theme_bar <- function(x, xgrid = FALSE, ygrid = FALSE, ...) {
-  camiller::theme_din(base_family = "Barlow Semi Condensed", xgrid = xgrid, ygrid = ygrid) +
-    theme(plot.caption.position = "plot",
-          strip.text = element_text(family = "Barlow Semi Condensed Semibold", face = "plain"),
-          ...)
-}
-theme_set(theme_bar())
-update_geom_defaults("col", list(fill = base_col))
-update_geom_defaults("text", list(size = 3.5, fontface = "bold", family = "Barlow Semi Condensed", color = tf_pal[["FALSE"]]))
-
-
-#------------ fetch
-fetch_latino <- multi_geo_acs(table = "B01001I", year = 2020, counties = NULL, towns = c("Meriden", "Wallingford")) %>%
-  label_acs() %>%
-  mutate(race = "latino") %>% 
-  select(level, name, year, estimate, moe, label)
-
-fetch_total <- multi_geo_acs(table = "B01001", year = 2020, counties = NULL, towns = c("Meriden", "Wallingford")) %>%
-  label_acs() %>%
-  select(level, name, year, estimate, moe, label)
-
-#------------ calc
-age_total <- fetch_total %>% 
-  separate(label, into = c("total", "sex", "age"), sep = "!!", fill = "right") %>%
-  filter(!is.na(age) | ((is.na(age) & is.na(sex)))) %>% 
-  replace_na(list(age = "all_ages")) %>%
-  mutate(race = "total") %>% 
-  select(year, level, name, race, age, estimate) %>% 
-  group_by(year, level, name, race) %>% 
-  add_grps(list(all_ages = 1, ages00_17 = 2:5, ages18_29 = 6:8, ages18_34 = 6:9, ages35_64 = 10:12, ages65_74 = 13, ages75_99 = 14:15), group = age)
-  
-latino_age <- fetch_latino %>%
-  separate(label, into = c("total", "sex", "age"), sep = "!!", fill = "right") %>%
-  filter(!is.na(age) | ((is.na(age) & is.na(sex)))) %>% 
-  replace_na(list(age = "all_ages")) %>%
-  select(year, level, name, race, age, estimate) %>% 
-  group_by(year, level, name, race) %>% 
-  add_grps(list(all_ages = 1, ages00_17 = 2:5, ages18_29 = 6:8, ages18_34 = 6:9, ages35_64 = 10:12, ages65_74 = 13, ages75_99 = 14:15), group = age)
-
-
-  rbind(race_age_total) %>%
-  spread(key = race, value = estimate) %>%
-  mutate(other_race = total - black - latino - white) %>%
-  gather(key = race, value = value, black:other_race) %>%
-  mutate(race = as.factor(race) %>% fct_relevel("total", "white", "black", "latino", "other_race"))
-
-  #------------ summarize for report areas
-meriden_wallingford <- race_age %>% 
-  filter(name %in% c("Meriden", "Wallingford", "Connecticut")) %>% 
-  ungroup() %>% 
-  mutate(name = if_else(name != "Connecticut", "Meriden & Wallingford", name)) %>% 
-  mutate(age = if_else(age %in% c("ages00_04", "ages05_17"), "ages00_17", as.character(age))) %>% 
-  mutate(age = as.factor(age),
-         age = fct_relevel(age, "all_ages", after = 0L)) %>% 
-  group_by(name, age, race) %>% 
-  summarise(value = sum(value)) %>% 
-  ungroup() %>% 
-  group_by(name, age) %>% 
-  camiller::calc_shares(group = race, denom = "total", value = value)
-
-meriden_wallingford %>% 
-  filter(race == "latino") %>% 
-  ggplot(aes(x = share, y = fct_rev(age))) +
-  geom_col(fill = "cadetblue") +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
-  facet_grid(cols = vars(name))
-
-#---------------------- survey
-
-#----------- read and clean
-read_english <- read_csv("Desktop/RJ milestone 1/(English) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv") %>% 
+### Read files
+```{r}
+read_english <- read_csv(paste(path, "(English) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv", sep = "")) %>% 
   janitor::clean_names() %>% 
   filter(!is.na(what_town_do_you_live_in))
 
-read_spanish <- read_csv("Desktop/RJ milestone 1/(Spanish) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv") %>% 
+read_spanish <- read_csv(paste(path, "(Spanish) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv", sep = "")) %>% 
   janitor::clean_names()
 
 qhead_eng <- tibble(question = paste("Q", 1:31, sep = ""),
@@ -105,8 +37,13 @@ qhead_spn <- tibble(question = paste("Q", 1:31, sep = ""),
 
 colnames(read_english) <- qhead_eng$question
 colnames(read_spanish) <- qhead_spn$question  
+```
 
-#----------- summaries
+## Summaries
+
+### Demographics
+
+```{r}
 response_town <- tibble(town = as.factor(read_english$Q19),
                         survey = as.factor("English")) %>% 
   bind_rows(tibble(town = as.factor(read_spanish$Q19),
@@ -115,27 +52,29 @@ response_town <- tibble(town = as.factor(read_english$Q19),
   mutate(town = if_else(!grepl("Meriden|Wallingford", town), "Other", as.character(town)))
 
 response_town %>% group_by(survey, town) %>% count()
+```
 
-###
-
+```{r}
 response_latino <- tibble(latino = as.factor(read_english$Q20),
                  survey = as.factor("English")) %>% 
   bind_rows(tibble(latino = as.factor(read_spanish$Q20),
                    survey = as.factor("Spanish")))
 
 response_latino %>%  group_by(survey, latino) %>% count()
+```
 
-###
-
+```{r}
 response_gender <- tibble(gender = as.factor(read_english$Q23),
                           survey = as.factor("English")) %>% 
   bind_rows(tibble(gender = as.factor(read_spanish$Q23),
                    survey = as.factor("Spanish")))
 
 response_gender %>%  group_by(survey, gender) %>% count()
+```
 
-###
+Birthplace is an open text field, need to sort around for common words
 
+```{r}
 response_birthplace <- tibble(place = as.factor(read_english$Q21),
                               survey = as.factor("English")) %>% 
   bind_rows(tibble(place = as.factor(read_spanish$Q21),
@@ -144,45 +83,45 @@ response_birthplace <- tibble(place = as.factor(read_english$Q21),
   mutate(clean = if_else(grepl("US|Us|us|USA|United|united|UNITED|ct", place), "United States", clean))
          
 response_birthplace %>% group_by(survey, clean) %>% count()
+```
 
-###
-
+```{r}
 response_lang_at_home <- tibble(lang = as.factor(read_english$Q24),
                               survey = as.factor("English")) %>% 
   bind_rows(tibble(lang = as.factor(read_spanish$Q24),
                    survey = as.factor("Spanish")))
 
 response_lang_at_home %>% group_by(survey, lang) %>% count()
+```
 
-###
-
+```{r}
 response_web_at_home <- tibble(internet = as.factor(read_english$Q27),
                            survey = as.factor("English")) %>% 
   bind_rows(tibble(internet = as.factor(read_spanish$Q27),
                    survey = as.factor("Spanish")))
 
 response_web_at_home %>% group_by(survey, internet) %>% count()
+```
 
-###
-
+```{r}
 response_device <- tibble(device = as.factor(read_english$Q26),
                           survey = as.factor("English")) %>% 
   bind_rows(tibble(device = as.factor(read_spanish$Q26),
                    survey = as.factor("Spanish")))
 
 response_device %>% group_by(device, survey) %>% count()
+```
 
-###
-
+```{r}
 response_voter <- tibble(registered = as.factor(read_english$Q28),
        survey = as.factor("English")) %>% 
   bind_rows(tibble(registered = as.factor(read_spanish$Q28),
                    survey = as.factor("Spanish")))
 
 response_voter %>% group_by(registered, survey) %>% count()
+```
 
-###
-
+```{r}
 response_details <- tibble(indicator = as.factor(read_english$Q25),
                            survey = as.factor("English")) %>% 
   bind_rows(tibble(indicator = as.factor(read_spanish$Q25),
@@ -193,9 +132,11 @@ response_details <- tibble(indicator = as.factor(read_english$Q25),
   mutate(across(survey:biz, as.factor))
 
 response_details %>% group_by(survey, biz) %>% count()
+```
 
-###
+### News habits
 
+```{r}
 response_mode <- tibble(mode = as.factor(read_english$Q9),
                            survey = as.factor("English")) %>% 
   bind_rows(tibble(mode = as.factor(read_spanish$Q9),
@@ -206,7 +147,9 @@ response_mode <- tibble(mode = as.factor(read_english$Q9),
          clean = if_else(grepl("Correo", clean), "Email/newsletters", clean),
          clean = if_else(grepl("Periódicos", clean), "Newspapers", clean),
          clean = if_else(clean == "Textos", "Text message", clean))
+```
 
+```{r echo = F}
 response_mode %>% 
   group_by(survey, clean) %>% 
   count() %>% 
@@ -224,10 +167,10 @@ response_mode %>%
         axis.text.x = element_text(color = "grey20", size = 10, lineheight = 1.5)) +
   labs(x = NULL, y = "Survey language", title = NULL)
 
-ggsave(filename = "news_mode.png", path = "Desktop/", dpi = "screen", height = 5)
+#ggsave(filename = "news_mode.png", path = plot_path, dpi = "screen", height = 5)
+```
 
-###
-
+```{r}
 response_pref_mode <- tibble(mode = as.factor(read_english$Q11),
                         survey = as.factor("English")) %>% 
   bind_rows(tibble(mode = as.factor(read_spanish$Q11),
@@ -238,7 +181,9 @@ response_pref_mode <- tibble(mode = as.factor(read_english$Q11),
          clean = if_else(grepl("Correo", clean), "Email/newsletter", clean),
          clean = if_else(grepl("Periódicos", clean), "Newspapers", clean),
          clean = if_else(clean %in% c("Textos", "Celular"), "Text message", clean))
+```
 
+```{r echo = F}
 response_pref_mode %>% 
   group_by(survey, clean) %>% 
   count() %>% 
@@ -256,10 +201,10 @@ response_pref_mode %>%
         axis.text.x = element_text(color = "grey20", size = 10, lineheight = 1.5)) +
   labs(x = NULL, y = "Survey language", title = NULL)
 
-ggsave(filename = "pref_mode.png", path = "Desktop/", dpi = "screen", height = 5)
+#ggsave(filename = "pref_mode.png", path = plot_path, dpi = "screen", height = 5)
+```
 
-###
-
+```{r}
 pref_lang <- tibble(tv_video = as.factor(read_english$Q6),
                     radio_audio = as.factor(read_english$Q7),
                     print = as.factor(read_english$Q8),
@@ -278,7 +223,9 @@ pref_lang <- tibble(tv_video = as.factor(read_english$Q6),
   mutate(print2 = if_else(grepl("Español", print), "Spanish", print2),
          print2 = if_else(grepl("Ambos", print), "Both English and Spanish", print2)) %>% 
   select(survey, Print = print2, `TV/video` = tv_video2, `Radio/audio` = radio_audio2)
+```
 
+```{r echo = F}
 pref_lang %>% 
   pivot_longer(cols = -survey, names_to = "mode", values_to = "language") %>% 
   group_by(survey, mode, language) %>% 
@@ -304,10 +251,12 @@ pref_lang %>%
         axis.text.y = element_blank()) +
   labs(x = NULL, y = "Survey language")
 
-ggsave(filename = "pref_lang.png", path = "Desktop/", dpi = "screen", height = 5)
+#ggsave(filename = "pref_lang.png", path = plot_path, dpi = "screen", height = 5)
+```
 
-###
+Preferred sources is also an open text field. Mining for a word cloud...
 
+```{r}
 eng_list <- str_split(read_english$Q10, ",| and | or|\\/|  ", simplify = T)
 spn_list <- str_split(read_spanish$Q10, ",| and | or|\\/|  ", simplify = T)
 x <- tibble(source = c(spn_list, eng_list)) %>% 
@@ -328,7 +277,9 @@ x <- tibble(source = c(spn_list, eng_list)) %>%
   mutate(source = str_trim(source, side = "both"))
 
 cloud <- x %>% group_by(source) %>% count()
+```
 
+```{r echo = F}
 library(ggwordcloud)
 
 set.seed(13)
@@ -339,10 +290,10 @@ ggplot(cloud, aes(label = source, size = n+3, color = n)) +
   theme_minimal() +
   scale_color_gradient(high = qual_pal[1], low = qual_pal[7])
 
-ggsave(filename = "cloud_source.png", path = "Desktop/", dpi = "screen", height = 5)
+#ggsave(filename = "cloud_source.png", path = plot_path, dpi = "screen", height = 5)
+```
 
-###
-
+```{r}
 eng_geo <- tibble(geo = c(str_split(read_english$Q2, ", ", simplify = T)),
                   survey = "English")
 spn_geo <- tibble(geo = c(str_split(read_spanish$Q2, ", ", simplify = T)),
@@ -354,7 +305,9 @@ response_geos <- bind_rows(eng_geo, spn_geo) %>%
          geo = if_else(geo == "Nacional", "National", geo),
          geo = if_else(grepl("Inter", geo), "International", geo),
          geo = if_else(grepl("Regional", geo), "Regional", geo))
+```
 
+```{r echo = F}
 response_geos %>%
   group_by(survey, geo) %>%
   count() %>% 
@@ -369,10 +322,12 @@ response_geos %>%
   theme(axis.text.y = element_blank()) +
   labs(x = NULL, y = "Survey Language")
 
-ggsave(filename = "geo_pref.png", path = "Desktop/", dpi = "screen", height = 5)
+#ggsave(filename = "geo_pref.png", path = plot_path, dpi = "screen", height = 5)
+```
 
-###
+We added Food in June, so there will be a new category to add next time this is run
 
+```{r}
 eng_topic <- tibble(topic = c(str_split(read_english$Q3, ", (?=[A-Z])", simplify = T)),
                   survey = "English")
 
@@ -403,7 +358,9 @@ response_topic <- bind_rows(eng_topic, spn_topic) %>%
          topic = str_replace(topic, "Opportunities", "Opps."),
          topic = str_replace(topic, "Community", "Comm."),
          topic = str_replace(topic, "community", "comm."))
+```
 
+```{r echo = F}
 response_topic %>%
   group_by(survey, topic) %>%
   count() %>% 
@@ -419,10 +376,10 @@ response_topic %>%
         text = element_text(size = 9)) +
   labs(y = NULL, x = NULL)
 
-ggsave(filename = "topic.png", path = "Desktop/", dpi = "screen", height = 6)
+#ggsave(filename = "topic.png", path = plot_path, dpi = "screen", height = 6)
+```
 
-###
-
+```{r}
 eng_special_topic <- tibble(topic = c(str_split(read_english$Q4, ", (?=[A-Z])", simplify = T)),
                     survey = "English") %>% 
   mutate(topic = str_remove(topic, "Topics related to "))
@@ -455,10 +412,12 @@ response_special_topic %>%
         text = element_text(size = 9)) +
   labs(y = "Topics relevant to...", x = NULL)
 
-ggsave(filename = "special_topic.png", path = "Desktop/", dpi = "screen")
+#ggsave(filename = "special_topic.png", path = plot_path, dpi = "screen")
+```
 
-###
+### Trust in news media
 
+```{r}
 trust <- tibble(national_news = as.factor(read_english$Q12),
                 local_news = as.factor(read_english$Q13),
                 social_media = as.factor(read_english$Q14),
@@ -486,7 +445,9 @@ trust <- tibble(national_news = as.factor(read_english$Q12),
          level = str_to_sentence(level)) %>% 
   group_by(survey, level) %>% 
   camiller::calc_shares(group = response, denom = "total", value = value)
+```
 
+```{r echo = F}
 trust %>% 
   filter(!is.na(share)) %>% 
   mutate(response = fct_relevel(response, "A lot", "Some", "Not at all"),
@@ -505,10 +466,10 @@ trust %>%
         text = element_text(size = 9)) +
   labs(x = NULL, y = NULL)
 
-ggsave(filename = "trust_sources.png", path = "Desktop/", dpi = "screen")
+#ggsave(filename = "trust_sources.png", path = plot_path, dpi = "screen")
+```
 
-###
-
+```{r}
 labels <- tibble(code = c("Q1", "Q2", "Q3"), 
             question = c("I trust the sources of news I get about my community", "The local news covers issues that are important to me", "The local news reflects my beliefs and customs"))
                          
@@ -538,7 +499,9 @@ beliefs <- tibble(Q1 = read_english$Q16,
   camiller::calc_shares(group = response, denom = "total", value = value) %>% 
   ungroup() %>% 
   filter(!is.na(share))
+```
 
+```{r echo = F}
 beliefs %>% 
   mutate(response = as.factor(response),
          response = fct_relevel(response, "Agree", "Neutral", "Disagree"),
@@ -554,4 +517,5 @@ beliefs %>%
         text = element_text(size = 9, lineheight = 1.5)) +
   labs(x = NULL, y = NULL)
 
-ggsave(filename = "beliefs.png", path = "Desktop/", dpi = "screen", height = 6)
+#ggsave(filename = "beliefs.png", path = plot_path dpi = "screen", height = 6)
+```
