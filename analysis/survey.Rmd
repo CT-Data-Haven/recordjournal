@@ -4,282 +4,491 @@ output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = T, warning = F, message = F)
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
 ```
 
 ```{r}
 library(tidyverse)
 library(cwi)
+library(janitor)
+library(camiller)
 source("../utils/plot_utils.R")
 ```
 
 **Cannot just re-run this! some denoms are hard-coded for non-response, and there's some text mining**
 
 ```{r}
-path <- "../survey_data/05162022/"
+path <- "../survey_data/06132022/"
 plot_path <- "../distro/"
 ```
 
 ### Read files
+
 ```{r}
 read_english <- read_csv(paste(path, "(English) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv", sep = "")) %>% 
-  janitor::clean_names() %>% 
-  filter(!is.na(what_town_do_you_live_in))
+  clean_names()
 
 read_spanish <- read_csv(paste(path, "(Spanish) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv", sep = "")) %>% 
-  janitor::clean_names()
+  clean_names()
 
 qhead_eng <- tibble(question = paste("Q", 1:31, sep = ""),
                     label = colnames(read_english))
-
 qhead_spn <- tibble(question = paste("Q", 1:31, sep = ""),
                     label = colnames(read_spanish))
 
 colnames(read_english) <- qhead_eng$question
-colnames(read_spanish) <- qhead_spn$question  
+colnames(read_spanish) <- qhead_eng$question
+
+read_english <- read_english %>% select(-Q1, -Q29) %>% remove_empty("rows")
+read_spanish <- read_spanish %>% select(-Q1, -Q29) %>% remove_empty("rows")
 ```
 
+```{r}
+responses <- tibble(survey = c("English", "Spanish"),
+                    responses = c(count(read_english), count(read_spanish))) %>% 
+  mutate(responses = as.integer(responses))
+
+responses
+```
 ## Summaries
 
 ### Demographics
 
 ```{r}
-response_town <- tibble(town = as.factor(read_english$Q19),
-                        survey = as.factor("English")) %>% 
-  bind_rows(tibble(town = as.factor(read_spanish$Q19),
-                   survey = as.factor("Spanish"))) %>% 
-  filter(!is.na(town)) %>% 
-  mutate(town = if_else(!grepl("Meriden|Wallingford", town), "Other", as.character(town)))
-
-response_town %>% group_by(survey, town) %>% count()
-```
-
-```{r}
-response_latino <- tibble(latino = as.factor(read_english$Q20),
-                 survey = as.factor("English")) %>% 
-  bind_rows(tibble(latino = as.factor(read_spanish$Q20),
-                   survey = as.factor("Spanish")))
-
-response_latino %>%  group_by(survey, latino) %>% count()
-```
-
-```{r}
-response_gender <- tibble(gender = as.factor(read_english$Q23),
+response_gender <- tibble(gender = read_english$Q23,
                           survey = as.factor("English")) %>% 
-  bind_rows(tibble(gender = as.factor(read_spanish$Q23),
-                   survey = as.factor("Spanish")))
+  bind_rows(tibble(gender = read_spanish$Q23,
+                   survey = as.factor("Spanish"))) %>% 
+   mutate(gender = if_else(gender == "Hombre", "Man", gender),
+          gender = if_else(gender == "Mujer", "Woman", gender)) %>% 
+  filter(!gender %in% c("Prefiero no decir", "Prefer not to say"), !is.na(gender)) %>% 
+  tabyl(gender, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = gender, denom = "Total", value = value) %>% 
+  mutate(gender = as.factor(gender),
+         gender = fct_relevel(gender, "Total", after = Inf))
+```
 
-response_gender %>%  group_by(survey, gender) %>% count()
+```{r}
+response_gender %>%
+  filter(!is.na(share)) %>% 
+  mutate(share = scales::percent(share, accuracy = 1)) %>%
+  select(-value) %>% 
+  pivot_wider(id_cols = gender, names_from = survey, values_from = share) %>% 
+  knitr::kable(caption = "Respondents by gender")
+```
+
+```{r}
+response_age <- response_town <- tibble(age = as.factor(read_english$Q22),
+                        survey = as.factor("English")) %>% 
+  bind_rows(tibble(age = as.factor(read_spanish$Q22),
+                   survey = as.factor("Spanish"))) %>% 
+  filter(!is.na(age)) %>% 
+  mutate(age = if_else(age == "70 o mayor", "70 or older", as.character(age))) %>% 
+  filter(!age %in% c("Prefiero no decir", "Prefer not to say")) %>% 
+  mutate(age = as.factor(age),
+         age = fct_relevel(age, "Under 18", after = 0L)) %>% 
+  tabyl(age, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = age, denom = "Total", value = value)
+```
+
+```{r}
+response_age %>% 
+  filter(!age == "Total") %>% 
+  ggplot(aes(x = share, y = fct_rev(age))) +
+  geom_col() +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
+  geom_text(data = . %>% filter(share == 0), aes(label = "NA"), hjust = 0, color = "black") +
+  facet_grid(cols = vars(survey)) +
+  labs(title = "Respondents by age", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank())
+```
+
+```{r}
+response_town <- tibble(town = read_english$Q19,
+                        survey = as.factor("English")) %>% 
+  bind_rows(tibble(town = read_spanish$Q19,
+                   survey = as.factor("Spanish"))) %>% 
+  mutate(town = str_to_title(town)) %>% 
+  filter(!is.na(town)) %>% 
+  mutate(town = if_else(!grepl("Meriden|Wallingford|Southington", town), "Other", town)) %>% 
+  mutate(town = as.factor(town),
+         town = fct_relevel(town, "Meriden", "Wallingford", "Southington", "Other")) %>% 
+  tabyl(town, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = town, denom = "Total", value = value)
+```
+
+```{r}
+response_town %>% 
+  filter(!town == "Total") %>% 
+  ggplot(aes(x = share, y = fct_rev(town))) +
+  geom_col() +
+  geom_text(data = . %>% filter(share > 0), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
+  geom_text(data = . %>% filter(share == 0), aes(label = "0%"), hjust = 0, color = "black") +
+  facet_grid(cols = vars(survey)) +
+  labs(title = "Respondents by town", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank())
+```
+
+```{r}
+response_latino <- tibble(latino = read_english$Q20,
+                 survey = as.factor("English")) %>% 
+  bind_rows(tibble(latino = read_spanish$Q20,
+                   survey = as.factor("Spanish"))) %>% 
+  filter(!is.na(latino), !latino %in% c("Prefiero no decir", "Prefer not to say")) %>% 
+  mutate(latino = if_else(latino == "Sí", "Yes", latino)) %>% 
+  tabyl(latino, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = latino, denom = "Total", value = value)
+```
+
+```{r}
+response_latino %>%
+  filter(!is.na(share)) %>% 
+  mutate(share = scales::percent(share, accuracy = 1)) %>%
+  select(-value) %>% 
+  pivot_wider(id_cols = latino, names_from = survey, values_from = share) %>% 
+  knitr::kable(caption = "Share of Latino respondents")
 ```
 
 Birthplace is an open text field, need to sort around for common words
 
 ```{r}
-response_birthplace <- tibble(place = as.factor(read_english$Q21),
+response_birthplace <- tibble(place = read_english$Q21,
                               survey = as.factor("English")) %>% 
-  bind_rows(tibble(place = as.factor(read_spanish$Q21),
+  bind_rows(tibble(place = read_spanish$Q21,
                    survey = as.factor("Spanish"))) %>% 
-  mutate(clean = if_else(grepl("Puerto|puerto", place), "Puerto Rico", as.character(place))) %>% 
-  mutate(clean = if_else(grepl("US|Us|us|USA|United|united|UNITED|ct", place), "United States", clean))
-         
-response_birthplace %>% group_by(survey, clean) %>% count()
+  filter(!is.na(place), place != "No") %>% 
+  mutate(clean = str_to_upper(place)) %>% 
+  mutate(clean = if_else(grepl("PUER", clean), "PUERTO RICO", clean),
+         clean = if_else(grepl("AMERICA|MERIDEN|US|USA|UNITED", clean), "USA", clean),
+         clean = if_else(grepl("REPUB", clean), "DOMINICAN REPUBLIC", clean)) %>% 
+  mutate(clean = if_else(!clean %in% c("USA", "PUERTO RICO", "DOMINICAN REPUBLIC", "ECUADOR", "MEXICO"), "OTHER", clean)) %>% 
+  mutate(clean = as.factor(clean),
+         clean = fct_relevel(clean, "OTHER", after = Inf)) %>% 
+  select(-place) %>% 
+  tabyl(clean, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = clean, denom = "Total", value = value)
 ```
 
 ```{r}
-response_lang_at_home <- tibble(lang = as.factor(read_english$Q24),
-                              survey = as.factor("English")) %>% 
-  bind_rows(tibble(lang = as.factor(read_spanish$Q24),
-                   survey = as.factor("Spanish")))
+response_birthplace %>% 
+  filter(!clean == "Total") %>% 
+  ggplot(aes(x = share, y = fct_rev(clean))) +
+  geom_col() +
+  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
+  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black") +
+  facet_grid(cols = vars(survey)) +
+  labs(title = "Respondents by birthplace", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank())
+```
 
-response_lang_at_home %>% group_by(survey, lang) %>% count()
+```{r}
+response_lang_at_home <- tibble(lang = read_english$Q24,
+                              survey = as.factor("English")) %>% 
+  bind_rows(tibble(lang = read_spanish$Q24,
+                   survey = as.factor("Spanish"))) %>% 
+  filter(!is.na(lang)) %>% 
+  mutate(lang = if_else(grepl("Ambos|Spanglish", lang), "Both English and Spanish", lang),
+         lang = if_else(lang == "Español", "Spanish", lang),
+         lang = if_else(!lang %in% c("English", "Spanish", "Both English and Spanish"), "Other", lang)) %>% 
+  mutate(lang = as.factor(lang),
+         lang = fct_relevel(lang, "English", "Both English and Spanish", "Spanish", "Other")) %>% 
+  tabyl(lang, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = lang, denom = "Total", value = value)
+```
+
+```{r}
+response_lang_at_home %>% 
+  filter(!is.na(share)) %>% 
+  ggplot(aes(x = lang, y = share, group = survey)) +
+  geom_col(position = position_dodge()) +
+  geom_text(data = . %>% filter(share >.1), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.1) +
+  geom_text(data = . %>% filter(share <=.1), aes(label = scales::percent(share, accuracy = 1)), vjust = -.1, color = "black") +
+  facet_grid(rows = vars(survey), switch = "y") +
+  labs(title = "Respondents by language spoken at home", x = NULL, y = NULL) +
+  theme(axis.text.y.left = element_blank())
 ```
 
 ```{r}
 response_web_at_home <- tibble(internet = as.factor(read_english$Q27),
                            survey = as.factor("English")) %>% 
   bind_rows(tibble(internet = as.factor(read_spanish$Q27),
-                   survey = as.factor("Spanish")))
-
-response_web_at_home %>% group_by(survey, internet) %>% count()
+                   survey = as.factor("Spanish"))) %>% 
+  mutate(internet = fct_collapse(internet, Yes = c("Yes", "Sí"))) %>% 
+  filter(!is.na(internet)) %>% 
+  tabyl(internet, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = internet, denom = "Total", value = value)
 ```
 
 ```{r}
-response_device <- tibble(device = as.factor(read_english$Q26),
-                          survey = as.factor("English")) %>% 
-  bind_rows(tibble(device = as.factor(read_spanish$Q26),
-                   survey = as.factor("Spanish")))
+response_web_at_home %>%
+  filter(!is.na(share)) %>% 
+  mutate(share = scales::percent(share, accuracy = 1)) %>%
+  select(-value) %>% 
+  pivot_wider(id_cols = internet, names_from = survey, values_from = share) %>% 
+  knitr::kable(caption = "Respondents with internet at home")
+```
 
-response_device %>% group_by(device, survey) %>% count()
+```{r}
+response_device <- tibble(device = read_english$Q26,
+                          survey = as.factor("English")) %>% 
+  bind_rows(tibble(device = read_spanish$Q26,
+                   survey = as.factor("Spanish"))) %>% 
+  filter(!is.na(device), device != "Prefer not to say") %>% 
+  mutate(device = as.factor(device),
+         device = fct_collapse(device, Yes = c("Yes", "Sí"))) %>% 
+  tabyl(device, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = device, denom = "Total", value = value)
+```
+
+```{r}
+response_device %>%
+  filter(!is.na(share)) %>% 
+  mutate(share = scales::percent(share, accuracy = 1)) %>%
+  select(-value) %>% 
+  pivot_wider(id_cols = device, names_from = survey, values_from = share) %>% 
+  knitr::kable(caption = "Respondents with smart devices")
 ```
 
 ```{r}
 response_voter <- tibble(registered = as.factor(read_english$Q28),
        survey = as.factor("English")) %>% 
   bind_rows(tibble(registered = as.factor(read_spanish$Q28),
-                   survey = as.factor("Spanish")))
-
-response_voter %>% group_by(registered, survey) %>% count()
+                   survey = as.factor("Spanish"))) %>% 
+   filter(!is.na(registered)) %>% 
+  mutate(registered = fct_collapse(registered, Yes = c("Yes", "Sí"), `Prefer not to say` = c("Prefer no to say", "Prefiero no decir"), `Not sure` = c("Not sure", "No estoy seguro/a"))) %>% 
+  tabyl(registered, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = registered, denom = "Total", value = value)
 ```
 
 ```{r}
-response_details <- tibble(indicator = as.factor(read_english$Q25),
-                           survey = as.factor("English")) %>% 
-  bind_rows(tibble(indicator = as.factor(read_spanish$Q25),
-                   survey = as.factor("Spanish"))) %>% 
-  mutate(student = if_else(grepl("stu", indicator), T, F),
-         parent = if_else(grepl("18", indicator), T, F),
-         biz = if_else(grepl("business|empresa", indicator), T, F)) %>% 
-  mutate(across(survey:biz, as.factor))
+response_voter %>% 
+  filter(!is.na(share)) %>% 
+  ggplot(aes(x = registered, y = share, group = survey)) +
+  geom_col(position = position_dodge()) +
+  geom_text(data = . %>% filter(share >.1), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.1) +
+  geom_text(data = . %>% filter(share <=.1), aes(label = scales::percent(share, accuracy = 1)), vjust = -.1, color = "black") +
+  facet_grid(rows = vars(survey), switch = "y") +
+  labs(title = "Respondents by voter registration status", x = NULL, y = NULL) +
+  theme(axis.text.y.left = element_blank())
+```
 
-response_details %>% group_by(survey, biz) %>% count()
+```{r}
+response_details <- tibble(indicator = read_english$Q25,
+                           survey = as.factor("English")) %>% 
+  bind_rows(tibble(indicator = read_spanish$Q25,
+                   survey = as.factor("Spanish"))) %>% 
+  filter(!is.na(indicator)) %>% 
+  mutate(indicator = if_else(grepl("stu", indicator), "Student", indicator),
+         indicator = if_else(grepl("18", indicator), "Parent", indicator),
+         indicator = if_else(grepl("business|empresa", indicator), "Business owner", indicator),
+         indicator = if_else(grepl("None|Ninguno", indicator), "None of these", indicator)) %>% 
+  mutate(indicator = as.factor(indicator),
+         indicator = fct_relevel(indicator, "None of these", after = Inf)) %>% 
+  tabyl(indicator, survey) %>% 
+  adorn_totals("row") %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = indicator, denom = "Total", value = value)
+```
+
+```{r}
+response_details %>% 
+  filter(!indicator == "Total") %>% 
+  ggplot(aes(x = share, y = fct_rev(indicator))) +
+  geom_col() +
+  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
+  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black") +
+  facet_grid(cols = vars(survey)) +
+  labs(title = "Respondents by demographic detail", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank())
 ```
 
 ### News habits
 
 ```{r}
-response_mode <- tibble(mode = as.factor(read_english$Q9),
-                           survey = as.factor("English")) %>% 
-  bind_rows(tibble(mode = as.factor(read_spanish$Q9),
-                   survey = as.factor("Spanish"))) %>% 
-  mutate(clean = if_else(grepl("app|online", mode), "News apps", as.character(mode))) %>% 
-  mutate(clean = if_else(mode %in% c("Medios sociales"), "Social media", clean),
-         clean = if_else(grepl("Amistades|Friends", clean), "Social circles", clean),
-         clean = if_else(grepl("Correo", clean), "Email/newsletters", clean),
-         clean = if_else(grepl("Periódicos", clean), "Newspapers", clean),
-         clean = if_else(clean == "Textos", "Text message", clean))
-```
-
-```{r echo = F}
-response_mode %>% 
-  group_by(survey, clean) %>% 
-  count() %>% 
-  ungroup() %>% 
-  add_row(survey = "Spanish", clean = "News apps", n = 0) %>% 
-  add_row(survey = "English", clean = "Text message", n = 0) %>% 
-  mutate(share = if_else(survey == "English", (n / 44), (n / 30))) %>% 
-  ggplot(aes(x = str_wrap(clean, 6), y = share)) +
-  geom_col(position = position_dodge(.9), width = .8) +
-  geom_text(data = . %>% filter(share > .03), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2, color = "white") +
-  geom_text(data = . %>% filter(share > 0 & share <= .03), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = -0.2, color = "grey20") +
-  geom_text(data = . %>% filter(share == 0), aes(label = "N/A"), position = position_dodge(.9), vjust = -1.2, color = "grey20") +
-  facet_grid(rows = vars(survey), scales = "free_x", switch = "y") +
-  theme(axis.text.y = element_blank(),
-        axis.text.x = element_text(color = "grey20", size = 10, lineheight = 1.5)) +
-  labs(x = NULL, y = "Survey language", title = NULL)
-
-#ggsave(filename = "news_mode.png", path = plot_path, dpi = "screen", height = 5)
-```
-
-```{r}
-response_pref_mode <- tibble(mode = as.factor(read_english$Q11),
+response_mode <- tibble(use_mode = as.factor(read_english$Q9),
+                        pref_mode = as.factor(read_english$Q11),
                         survey = as.factor("English")) %>% 
-  bind_rows(tibble(mode = as.factor(read_spanish$Q11),
+  bind_rows(tibble(use_mode = as.factor(read_spanish$Q9),
+                   pref_mode = as.factor(read_spanish$Q11),
                    survey = as.factor("Spanish"))) %>% 
-  mutate(clean = if_else(grepl("app|online|noticias|Same", mode), "News apps", as.character(mode))) %>% 
-  mutate(clean = if_else(mode %in% c("Medios sociales"), "Social media", clean),
-         clean = if_else(grepl("Amistades|Friends", clean), "Social circles", clean),
-         clean = if_else(grepl("Correo", clean), "Email/newsletter", clean),
-         clean = if_else(grepl("Periódicos", clean), "Newspapers", clean),
-         clean = if_else(clean %in% c("Textos", "Celular"), "Text message", clean))
+  filter(!is.na(pref_mode) & !is.na(use_mode)) %>% 
+  mutate(clean_use = if_else(grepl("app|online|noticias", use_mode), "News apps", as.character(use_mode)),
+         clean_use = if_else(use_mode %in% c("Medios sociales"), "Social media", clean_use),
+         clean_use = if_else(grepl("Amistades|Friends|Familiares", clean_use), "Social circles", clean_use),
+         clean_use = if_else(grepl("Correo", clean_use), "Email/newsletters", clean_use),
+         clean_use = if_else(grepl("Periódicos", clean_use), "Newspapers", clean_use),
+         clean_use = if_else(clean_use == "Textos", "Text message", clean_use)) %>% 
+  mutate(clean_pref = if_else(grepl("app|online|noticias|Same", pref_mode), "News apps", as.character(pref_mode)),
+         clean_pref = if_else(pref_mode %in% c("Medios sociales"), "Social media", clean_pref),
+         clean_pref = if_else(grepl("Amistades|Friends|Familiares", clean_pref), "Social circles", clean_pref),
+         clean_pref = if_else(grepl("Correo|Email", clean_pref), "Email/newsletters", clean_pref),
+         clean_pref = if_else(grepl("Periódicos", clean_pref), "Newspapers", clean_pref),
+         clean_pref = if_else(clean_pref == "Textos", "Text message", clean_pref),
+         clean_pref = if_else(clean_pref == "Celular", "Text message", clean_pref)) %>% 
+  select(survey, clean_use, clean_pref)
+
+mode_to_plot <- response_mode %>%
+  select(survey, mode = clean_use) %>%
+  tabyl(mode, survey) %>% 
+  adorn_totals("row") %>% 
+  mutate(type = "Use") %>% 
+  bind_rows(response_mode %>% 
+              select(survey, mode = clean_pref) %>% 
+              tabyl(mode, survey) %>% 
+              adorn_totals("row") %>% 
+              mutate(type = "Prefer")) %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey, type) %>% 
+  calc_shares(group = mode, denom = "Total", value = value)
 ```
 
-```{r echo = F}
-response_pref_mode %>% 
-  group_by(survey, clean) %>% 
-  count() %>% 
-  ungroup() %>% 
-  add_row(survey = "Spanish", clean = "Radio", n = 0) %>% 
-  add_row(survey = "English", clean = "Social circles", n = 0) %>% 
-  mutate(share = if_else(survey == "English", (n / 44), (n / 30))) %>% 
-  ggplot(aes(x = str_wrap(clean, 6), y = share)) +
-  geom_col(position = position_dodge(.9), width = .8) +
-  geom_text(data = . %>% filter(share > .04), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2, color = "white") +
-  geom_text(data = . %>% filter(share > 0 & share <= .04), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = -0.2, color = "grey20") +
-  geom_text(data = . %>% filter(share == 0), aes(label = "N/A"), position = position_dodge(.9), vjust = -1.2, color = "grey20") +
-  facet_grid(rows = vars(survey), scales = "free_x", switch = "y") +
-  theme(axis.text.y = element_blank(),
-        axis.text.x = element_text(color = "grey20", size = 10, lineheight = 1.5)) +
-  labs(x = NULL, y = "Survey language", title = NULL)
 
-#ggsave(filename = "pref_mode.png", path = plot_path, dpi = "screen", height = 5)
+```{r}
+mode_to_plot %>% 
+  filter(survey == "English") %>% 
+  filter(!is.na(share)) %>% 
+  ggplot(aes(x = type, y = share, group = mode)) +
+  geom_col(aes(fill = type), position = position_dodge(.9), width = .7) +
+  geom_text(data = . %>% filter(share <= .05), aes(label = scales::percent(share, accuracy = 1)), vjust = -.2, color = "black") +
+  geom_text(data = . %>% filter(share > .05), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
+  facet_wrap(~mode) +
+  scale_fill_manual(values = unname(qual_pal[c("violet", "cyan", "pink")])) +
+  theme(axis.text.y = element_blank(),
+        legend.position = "none") +
+  labs(x = NULL, y = NULL, title = "News media preferences and use, English survey")
+
+mode_to_plot %>% 
+  filter(survey == "Spanish") %>% 
+  filter(!is.na(share)) %>% 
+  ggplot(aes(x = type, y = share, group = mode)) +
+  geom_col(aes(fill = type), position = position_dodge(.9), width = .7) +
+  geom_text(data = . %>% filter(share <= .05), aes(label = scales::percent(share, accuracy = 1)), vjust = -.2, color = "black") +
+  geom_text(data = . %>% filter(share > .05), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
+  facet_wrap(~mode) +
+  scale_fill_manual(values = unname(qual_pal[c("violet", "cyan", "pink")])) +
+  theme(axis.text.y = element_blank(),
+        legend.position = "none") +
+  labs(x = NULL, y = NULL, title = "News media preferences and use, Spanish survey")
 ```
 
 ```{r}
-pref_lang <- tibble(tv_video = as.factor(read_english$Q6),
-                    radio_audio = as.factor(read_english$Q7),
-                    print = as.factor(read_english$Q8),
+pref_lang <- tibble(tv_video = read_english$Q6,
+                    radio_audio = read_english$Q7,
+                    print = read_english$Q8,
                     survey = as.factor("English")) %>% 
-  bind_rows(tibble(tv_video = as.factor(read_spanish$Q6),
-                   radio_audio = as.factor(read_spanish$Q7),
-                   print = as.factor(read_spanish$Q8),
+  bind_rows(tibble(tv_video = read_spanish$Q6,
+                   radio_audio = read_spanish$Q7,
+                   print = read_spanish$Q8,
                    survey = as.factor("Spanish"))) %>% 
-  mutate(tv_video2 = if_else(grepl("Inglés", tv_video), "English", as.character(tv_video))) %>% 
-  mutate(tv_video2 = if_else(grepl("Español", tv_video), "Spanish", tv_video2),
-         tv_video2 = if_else(grepl("Ambos", tv_video), "Both English and Spanish", tv_video2)) %>% 
-  mutate(radio_audio2 = if_else(grepl("Inglés", radio_audio), "English", as.character(radio_audio))) %>% 
-  mutate(radio_audio2 = if_else(grepl("Español", radio_audio), "Spanish", radio_audio2),
-         radio_audio2 = if_else(grepl("Ambos", radio_audio), "Both English and Spanish", radio_audio2)) %>% 
-  mutate(print2 = if_else(grepl("Inglés", print), "English", as.character(print))) %>% 
-  mutate(print2 = if_else(grepl("Español", print), "Spanish", print2),
-         print2 = if_else(grepl("Ambos", print), "Both English and Spanish", print2)) %>% 
-  select(survey, Print = print2, `TV/video` = tv_video2, `Radio/audio` = radio_audio2)
+  mutate(tv_video = if_else(grepl("Inglés", tv_video), "English", tv_video),
+         tv_video = if_else(grepl("Español", tv_video), "Spanish", tv_video),
+         tv_video = if_else(grepl("Ambos", tv_video), "Both English and Spanish", tv_video)) %>% 
+  mutate(radio_audio = if_else(grepl("Inglés", radio_audio), "English", radio_audio),
+         radio_audio = if_else(grepl("Español", radio_audio), "Spanish", radio_audio),
+         radio_audio = if_else(grepl("Ambos", radio_audio), "Both English and Spanish", radio_audio)) %>% 
+  mutate(print = if_else(grepl("Inglés", print), "English", print),
+         print = if_else(grepl("Español", print), "Spanish", print),
+         print = if_else(grepl("Ambos", print), "Both English and Spanish", print))
+
+pref_lang_to_plot <- pref_lang %>%
+  select(survey, language = tv_video) %>%
+  filter(!is.na(language), language != "I don't use this format") %>% 
+  tabyl(language, survey) %>% 
+  adorn_totals("row") %>% 
+  mutate(type = "TV/Video") %>% 
+  bind_rows(pref_lang %>% 
+              select(survey, language = radio_audio) %>% 
+              filter(!is.na(language), language != "I don't use this format") %>%  
+              tabyl(language, survey) %>% 
+              adorn_totals("row") %>% 
+              mutate(type = "Radio/Audio")) %>% 
+  bind_rows(pref_lang %>% 
+              select(survey, language = print) %>% 
+              filter(!is.na(language), language != "I don't use this format") %>%  
+              tabyl(language, survey) %>% 
+              adorn_totals("row") %>% 
+              mutate(type = "Print")) %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey, type) %>% 
+  calc_shares(group = language, denom = "Total", value = value)
 ```
 
-```{r echo = F}
-pref_lang %>% 
-  pivot_longer(cols = -survey, names_to = "mode", values_to = "language") %>% 
-  group_by(survey, mode, language) %>% 
-  count() %>% 
-  ungroup() %>%
-  filter(!is.na(language), language != "I don't use this format") %>% 
-  pivot_wider(id_cols = c("survey", "mode"), names_from = "language", values_from = "n") %>% 
-  mutate(total = `Both English and Spanish` + English + Spanish) %>% 
-  pivot_longer(cols = `Both English and Spanish`:total, names_to = "language", values_to = "count") %>% 
-  group_by(survey, mode) %>% 
-  camiller::calc_shares(group = language, denom = "total", value = count) %>% 
-  mutate(language = as.character(language)) %>% 
-  filter(language != "total") %>%
-  ggplot(aes(x = str_wrap(language, 7), y = share)) +
+```{r}
+pref_lang_to_plot %>% 
+  filter(!is.na(share)) %>% 
+  ggplot(aes(x = language, y = share)) +
   geom_col(aes(fill = language), position = position_dodge(.9), width = .8) +
-  geom_text(data = . %>% filter(share > 0.099), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
-  geom_text(data = . %>% filter(share <= 0.099), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = -.2, color = "grey20") +
+  geom_text(data = . %>% filter(share > 0.1), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
+  geom_text(data = . %>% filter(share <= 0.1), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = -.2, color = "grey20") +
   guides(fill = guide_legend(title = NULL)) +
-  facet_grid(rows = vars(survey), cols = vars(mode), scales = "free_y", switch = "y") +
+  facet_grid(rows = vars(survey), cols = vars(type), scales = "free_y", switch = "y") +
   scale_fill_manual(values = unname(qual_pal[c("violet", "cyan", "pink")])) +
   theme(legend.position = "bottom",
         axis.text.x = element_blank(),
         axis.text.y = element_blank()) +
-  labs(x = NULL, y = "Survey language")
-
-#ggsave(filename = "pref_lang.png", path = plot_path, dpi = "screen", height = 5)
+  labs(x = NULL, y = "Survey language", title = "Share of respondents by preferred langauge by mode")
 ```
 
 Preferred sources is also an open text field. Mining for a word cloud...
 
 ```{r}
-eng_list <- str_split(read_english$Q10, ",| and | or|\\/|  ", simplify = T)
-spn_list <- str_split(read_spanish$Q10, ",| and | or|\\/|  ", simplify = T)
+eng_list <- str_split(read_english$Q10, ",| y | and | or|\\/|  ", simplify = T)
+spn_list <- str_split(read_spanish$Q10, ",| y | and | or|\\/|  ", simplify = T)
+
+add_back <- tibble(source = c("FACEBOOK", "GOOGLE", "HARTFORD COURANT", "TELEMUNDO", "WFSB", "TELEFE INTERNATIONAL", "RECORD-JOURNAL", "FACEBOOK", "HARTFORD COURANT", "CT POST", "WTNH", "TELEMUNDO"))
+                              
+                              
 x <- tibble(source = c(spn_list, eng_list)) %>% 
   filter(!is.na(source), source != "") %>% 
   mutate(source = str_to_upper(source)) %>%
   mutate(source = str_trim(source, side = "both")) %>% 
   mutate(source = str_remove(source,  c(" IF AVAILABLE| PRINT EDITION"))) %>% 
-  filter(!source %in% c("N", "A", "FACEBOOK GOOGLE", "HARTFORD COURANT TELEMUNDO WFSB 3 TELEFE INTERNATIONAL", "RECORD JOURNAL FACEBOOK")) %>% #will add these back properly below
-  mutate(source = if_else(grepl("RECORD|RJ", source), "RECORD-JOURNAL", source),
+  filter(!source %in% c("N", "A", "FACEBOOK GOOGLE", "HARTFORD COURANT TELEMUNDO WFSB 3 TELEFE INTERNATIONAL", "RECORD JOURNAL FACEBOOK", "HARTFORD COURANT CT POST WTNH", "TODO", "TODOS", "UN POCO DE TODO", "USUALLY TELEMUNDO", "NONE")) %>% #will add these back properly below
+  mutate(source = if_else(grepl("RECORD|RJ|R-J", source), "RECORD-JOURNAL", source),
          source = if_else(grepl("NBC|CHANNEL 30", source), "NBC", source),
          source = if_else(grepl("FOX", source), "FOX NEWS", source),
          source = if_else(grepl("CHANNEL 8", source), "WTNH", source),
-         source = if_else(grepl("WFSB", source), "WFSB", source),
+         source = if_else(grepl("CHANNEL 3|CHANEL 3|WFSB", source), "WFSB", source),
          source = if_else(grepl("BREAK", source), "NEWSBREAK", source),
          source = if_else(grepl("LOCAL", source), "LOCAL STATIONS", source),
-         source = if_else(grepl("HEARD", source), "NEW BRITAIN HERALD", source),
-         source = if_else(grepl("WAPO", source), "WASHINGTON POST", source)) %>% 
-  mutate(source = str_trim(source, side = "both"))
+         source = if_else(grepl("HEARALD", source), "NEW BRITAIN HERALD", source),
+         source = if_else(grepl("WAPO", source), "WASHINGTON POST", source),
+         source = if_else(grepl("UNIV", source), "UNIVISION", source)) %>% 
+  mutate(source = str_trim(source, side = "both")) %>% 
+  bind_rows(add_back)
 
 cloud <- x %>% group_by(source) %>% count()
 ```
 
-```{r echo = F}
+```{r}
 library(ggwordcloud)
 
 set.seed(13)
@@ -289,9 +498,9 @@ ggplot(cloud, aes(label = source, size = n+3, color = n)) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
   scale_color_gradient(high = qual_pal[1], low = qual_pal[7])
-
-#ggsave(filename = "cloud_source.png", path = plot_path, dpi = "screen", height = 5)
 ```
+
+Denoms are hard-coded so we get share of respondents, not share of responses
 
 ```{r}
 eng_geo <- tibble(geo = c(str_split(read_english$Q2, ", ", simplify = T)),
@@ -300,32 +509,36 @@ spn_geo <- tibble(geo = c(str_split(read_spanish$Q2, ", ", simplify = T)),
                   survey = "Spanish")
 
 response_geos <- bind_rows(eng_geo, spn_geo) %>% 
-  filter(geo != "") %>% 
+  filter(!geo %in% c("", "No", "None", "Yo'u're too biased.  way too liberal.", "PUERTO RICO")) %>% 
   mutate(geo = if_else(geo == "Estatal", "State", geo),
          geo = if_else(geo == "Nacional", "National", geo),
          geo = if_else(grepl("Inter", geo), "International", geo),
-         geo = if_else(grepl("Regional", geo), "Regional", geo))
+         geo = if_else(grepl("Regional", geo), "Regional", geo)) %>% 
+  mutate(geo = str_to_title(geo)) %>% 
+  filter(!is.na(geo)) %>% 
+  tabyl(geo, survey) %>% 
+  add_row(geo = "Total", English = 83, Spanish  = 99) %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = geo, denom = "Total", value = value)
 ```
+
+Also note that one person wrote in Puerto Rico for the geographical question. 
 
 ```{r echo = F}
 response_geos %>%
-  group_by(survey, geo) %>%
-  count() %>% 
-  ungroup() %>% 
+  filter(!is.na(share)) %>% 
   mutate(geo = as.factor(geo),
          geo = fct_relevel(geo, "Local", "State", "Regional", "National", "International")) %>% 
-  mutate(share = if_else(survey == "English", n/44, n/30)) %>% 
   ggplot(aes(x = geo, y = share)) +
   geom_col(width = .8) +
   geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
   facet_grid(rows = vars(survey), switch = "y") +
   theme(axis.text.y = element_blank()) +
-  labs(x = NULL, y = "Survey Language")
-
-#ggsave(filename = "geo_pref.png", path = plot_path, dpi = "screen", height = 5)
+  labs(x = NULL, y = NULL, title = "Respondents by geographical interest")
 ```
 
-We added Food in June, so there will be a new category to add next time this is run
+We added Food in June. Also hard coded denoms.
 
 ```{r}
 eng_topic <- tibble(topic = c(str_split(read_english$Q3, ", (?=[A-Z])", simplify = T)),
@@ -352,31 +565,30 @@ response_topic <- bind_rows(eng_topic, spn_topic) %>%
          topic = if_else(grepl("Oport", topic), "Opportunities for community engagement", topic),
          topic = if_else(grepl("Viajes", topic), "Travel and hospitality", topic),
          topic = if_else(grepl("cambio", topic), "Environmental issues & climate change", topic),
-         topic = if_else(grepl("vivienda", topic), "Real estate and homeownership", topic)) %>% 
+         topic = if_else(grepl("vivienda", topic), "Real estate and homeownership", topic),
+         topic = if_else(topic == "Comida", "Food", topic)) %>% 
   mutate(topic = str_replace(topic, "&", "and"),
          topic = str_replace(topic, "Environmental", "Env."),
          topic = str_replace(topic, "Opportunities", "Opps."),
          topic = str_replace(topic, "Community", "Comm."),
-         topic = str_replace(topic, "community", "comm."))
+         topic = str_replace(topic, "community", "comm.")) %>% 
+  tabyl(topic, survey) %>% 
+  filter(topic != "None") %>% 
+  add_row(topic = "Total", English = 83, Spanish  = 99) %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = topic, denom = "Total", value = value)
 ```
 
-```{r echo = F}
+```{r fig.height=6}
 response_topic %>%
-  group_by(survey, topic) %>%
-  count() %>% 
-  ungroup() %>% 
-  mutate(topic = as.factor(topic),
-         topic = fct_rev(topic)) %>% 
-  mutate(share = if_else(survey == "English", n/44, n/30)) %>% 
-  ggplot(aes(x = share, y = reorder(topic, share))) +
+  filter(!is.na(share)) %>% 
+  ggplot(aes(x = share, y = reorder(str_wrap(topic, 20), share))) +
   geom_col(width = .8) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, size = 2.75) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
   facet_grid(cols = vars(survey)) +
-  theme(axis.text.x = element_blank(),
-        text = element_text(size = 9)) +
-  labs(y = NULL, x = NULL)
-
-#ggsave(filename = "topic.png", path = plot_path, dpi = "screen", height = 6)
+  theme(axis.text.x = element_blank()) +
+  labs(y = NULL, x = NULL, title = "Share of respondents by topics of interest")
 ```
 
 ```{r}
@@ -395,24 +607,24 @@ response_special_topic <- bind_rows(eng_special_topic, spn_special_topic) %>%
          topic = if_else(grepl("edad", topic), "Seniors", topic),
          topic = if_else(grepl("Los", topic), "Teens", topic),
          topic = if_else(grepl("Jóvenes", topic), "Young adults", topic),
-         topic = if_else(grepl("Participacion", topic), "Community engagement", topic))
+         topic = if_else(grepl("Participacion", topic), "Community engagement", topic)) %>%
+  filter(!topic %in% c("None of these", "No", "Ninguno de estos")) %>% 
+  tabyl(topic, survey) %>% 
+  add_row(topic = "Total", English = 83, Spanish  = 99) %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = topic, denom = "Total", value = value)
 
 response_special_topic %>% 
-  group_by(survey, topic) %>%
-  count() %>% 
-  ungroup() %>% 
+  filter(!is.na(share)) %>% 
   mutate(topic = as.factor(topic),
          topic = fct_rev(topic)) %>% 
-  mutate(share = if_else(survey == "English", n/44, n/30)) %>% 
   ggplot(aes(x = share, y = reorder(topic, share))) +
   geom_col(width = .8) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, size = 2.75) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
   facet_grid(cols = vars(survey)) +
-  theme(axis.text.x = element_blank(),
-        text = element_text(size = 9)) +
-  labs(y = "Topics relevant to...", x = NULL)
-
-#ggsave(filename = "special_topic.png", path = plot_path, dpi = "screen")
+  theme(axis.text.x = element_blank()) +
+  labs(y = "Topics relevant to...", x = NULL, title = "Share of respondents by special topic area")
 ```
 
 ### Trust in news media
@@ -447,7 +659,7 @@ trust <- tibble(national_news = as.factor(read_english$Q12),
   camiller::calc_shares(group = response, denom = "total", value = value)
 ```
 
-```{r echo = F}
+```{r fig.width=7}
 trust %>% 
   filter(!is.na(share)) %>% 
   mutate(response = fct_relevel(response, "A lot", "Some", "Not at all"),
@@ -457,16 +669,13 @@ trust %>%
          level = fct_rev(level)) %>% 
   ggplot(aes(x = share, y = level, fill = response)) +
   geom_col(position = position_stack(.5), width = .8) +
-  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5), size = 2.7) +
+  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
   facet_grid(cols = vars(survey)) +
   scale_fill_manual(values = rev(opinion_pal)) +
   guides(fill = guide_legend(title = "Trust in source:", reverse = T)) +
   theme(axis.text.x = element_blank(),
-        legend.position = "bottom",
-        text = element_text(size = 9)) +
-  labs(x = NULL, y = NULL)
-
-#ggsave(filename = "trust_sources.png", path = plot_path, dpi = "screen")
+        legend.position = "bottom") +
+  labs(x = NULL, y = NULL, title = "Share of respondents who trust news sources")
 ```
 
 ```{r}
@@ -508,14 +717,11 @@ beliefs %>%
          response = fct_rev(response)) %>% 
   ggplot(aes(x = share, y = str_wrap(question, 25), fill = response)) +
   geom_col(position = position_stack(), width = .8) +
-  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5), size = 2.7) +
+  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
   facet_grid(cols = vars(survey)) +
   scale_fill_manual(values = rev(opinion_pal)) +
   guides(fill = guide_legend(title = NULL, reverse = T)) +
   theme(axis.text.x = element_blank(),
-        legend.position = "bottom",
-        text = element_text(size = 9, lineheight = 1.5)) +
-  labs(x = NULL, y = NULL)
-
-#ggsave(filename = "beliefs.png", path = plot_path dpi = "screen", height = 6)
+        legend.position = "bottom") +
+  labs(x = NULL, y = NULL, title = str_wrap("Share of respondents agreeing with statements regarding trust in local news", 60))
 ```
