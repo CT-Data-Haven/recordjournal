@@ -13,9 +13,10 @@ library(cwi)
 library(janitor)
 library(camiller)
 source("../utils/plot_utils.R")
+
+#Cannot just re-run this! some denoms are hard-coded for non-response, and there's some text mining
 ```
 
-**Cannot just re-run this! some denoms are hard-coded for non-response, and there's some text mining**
 
 ```{r}
 path <- "../survey_data/06132022/"
@@ -42,6 +43,8 @@ colnames(read_spanish) <- qhead_eng$question
 read_english <- read_english %>% select(-Q1, -Q29) %>% remove_empty("rows")
 read_spanish <- read_spanish %>% select(-Q1, -Q29) %>% remove_empty("rows")
 ```
+
+Current number of respondents (blanks removed) as of June 13, 2022
 
 ```{r}
 responses <- tibble(survey = c("English", "Spanish"),
@@ -71,13 +74,15 @@ response_gender <- tibble(gender = read_english$Q23,
          gender = fct_relevel(gender, "Total", after = Inf))
 ```
 
+Respondents by gender
+
 ```{r}
 response_gender %>%
   filter(!is.na(share)) %>% 
   mutate(share = scales::percent(share, accuracy = 1)) %>%
   select(-value) %>% 
   pivot_wider(id_cols = gender, names_from = survey, values_from = share) %>% 
-  knitr::kable(caption = "Respondents by gender")
+  knitr::kable()
 ```
 
 ```{r}
@@ -96,6 +101,8 @@ response_age <- response_town <- tibble(age = as.factor(read_english$Q22),
   group_by(survey) %>% 
   calc_shares(group = age, denom = "Total", value = value)
 ```
+
+It might be harder to get young people to respond based on current outreach (grocery stores, links on articles, etc.) but maybe at the PR festival? Otherwise, we do have the HS student focus group to help fill in that gap.
 
 ```{r}
 response_age %>% 
@@ -126,6 +133,8 @@ response_town <- tibble(town = read_english$Q19,
   calc_shares(group = town, denom = "Total", value = value)
 ```
 
+Other towns are usually 1-2 people from some other location in Connecticut. Do we want to start specifying the region around Meriden and Wallingford as opposed to like Hartford, New Haven, Waterbury, etc.
+
 ```{r}
 response_town %>% 
   filter(!town == "Total") %>% 
@@ -152,13 +161,15 @@ response_latino <- tibble(latino = read_english$Q20,
   calc_shares(group = latino, denom = "Total", value = value)
 ```
 
+Most respondents are Latino
+
 ```{r}
 response_latino %>%
   filter(!is.na(share)) %>% 
   mutate(share = scales::percent(share, accuracy = 1)) %>%
   select(-value) %>% 
   pivot_wider(id_cols = latino, names_from = survey, values_from = share) %>% 
-  knitr::kable(caption = "Share of Latino respondents")
+  knitr::kable()
 ```
 
 Birthplace is an open text field, need to sort around for common words
@@ -214,6 +225,8 @@ response_lang_at_home <- tibble(lang = read_english$Q24,
   calc_shares(group = lang, denom = "Total", value = value)
 ```
 
+Other languages for Spanish survey were "dialect" (I'm not sure which so I put it in other), for English survey: German, Polish, Marathi.
+
 ```{r}
 response_lang_at_home %>% 
   filter(!is.na(share)) %>% 
@@ -240,13 +253,15 @@ response_web_at_home <- tibble(internet = as.factor(read_english$Q27),
   calc_shares(group = internet, denom = "Total", value = value)
 ```
 
+Even though most people have the internet at home, fewer Spanish survey respondents do, which might lend towards them preferring text, word of mouth, etc. for news.
+
 ```{r}
 response_web_at_home %>%
   filter(!is.na(share)) %>% 
   mutate(share = scales::percent(share, accuracy = 1)) %>%
   select(-value) %>% 
   pivot_wider(id_cols = internet, names_from = survey, values_from = share) %>% 
-  knitr::kable(caption = "Respondents with internet at home")
+  knitr::kable()
 ```
 
 ```{r}
@@ -264,13 +279,15 @@ response_device <- tibble(device = read_english$Q26,
   calc_shares(group = device, denom = "Total", value = value)
 ```
 
+Similar trends in device access. I would like to be able to disaggregate this by age in the future.
+
 ```{r}
 response_device %>%
   filter(!is.na(share)) %>% 
   mutate(share = scales::percent(share, accuracy = 1)) %>%
   select(-value) %>% 
   pivot_wider(id_cols = device, names_from = survey, values_from = share) %>% 
-  knitr::kable(caption = "Respondents with smart devices")
+  knitr::kable()
 ```
 
 ```{r}
@@ -286,6 +303,8 @@ response_voter <- tibble(registered = as.factor(read_english$Q28),
   group_by(survey) %>% 
   calc_shares(group = registered, denom = "Total", value = value)
 ```
+
+Voter registration status may be complicated by citizenship status, since so many Spanish language respondents were born abroad.
 
 ```{r}
 response_voter %>% 
@@ -318,6 +337,8 @@ response_details <- tibble(indicator = read_english$Q25,
   calc_shares(group = indicator, denom = "Total", value = value)
 ```
 
+Lots of parents which makes sense given the grocery store outreach. Fewer students among the Spanish language survey probably related to fewer young people responding.
+
 ```{r}
 response_details %>% 
   filter(!indicator == "Total") %>% 
@@ -331,6 +352,8 @@ response_details %>%
 ```
 
 ### News habits
+
+I broke these into two charts by survey language so we can compare what medium they prefer to which they use more easily.
 
 ```{r}
 response_mode <- tibble(use_mode = as.factor(read_english$Q9),
@@ -370,6 +393,7 @@ mode_to_plot <- response_mode %>%
   calc_shares(group = mode, denom = "Total", value = value)
 ```
 
+For English language respondents, there's a greater preference than use for Email, Text, and news apps, which I think suggest that people prefer more of a digest style news update. TV and social media are popular, too. Again, I want to disaggregate this by age in the future.
 
 ```{r}
 mode_to_plot %>% 
@@ -384,7 +408,11 @@ mode_to_plot %>%
   theme(axis.text.y = element_blank(),
         legend.position = "none") +
   labs(x = NULL, y = NULL, title = "News media preferences and use, English survey")
+```
 
+For Spanish language respondents, the strong preference towards TV and social media might be in language availability as well as the content covered in Spanish-language TV and through social circles online. Here it would be interesting to disaggregate by age as well as topics or geographies of interest.
+
+```{r}
 mode_to_plot %>% 
   filter(survey == "Spanish") %>% 
   filter(!is.na(share)) %>% 
@@ -440,6 +468,8 @@ pref_lang_to_plot <- pref_lang %>%
   group_by(survey, type) %>% 
   calc_shares(group = language, denom = "Total", value = value)
 ```
+
+With language, again a strong preference towards the survey language and "both." In future focus groups if we can ask people who prefer both why they do, that would be helpful.
 
 ```{r}
 pref_lang_to_plot %>% 
@@ -500,9 +530,9 @@ ggplot(cloud, aes(label = source, size = n+3, color = n)) +
   scale_color_gradient(high = qual_pal[1], low = qual_pal[7])
 ```
 
-Denoms are hard-coded so we get share of respondents, not share of responses
-
 ```{r}
+#Denoms are hard-coded so we get share of respondents, not share of responses
+
 eng_geo <- tibble(geo = c(str_split(read_english$Q2, ", ", simplify = T)),
                   survey = "English")
 spn_geo <- tibble(geo = c(str_split(read_spanish$Q2, ", ", simplify = T)),
@@ -523,7 +553,7 @@ response_geos <- bind_rows(eng_geo, spn_geo) %>%
   calc_shares(group = geo, denom = "Total", value = value)
 ```
 
-Also note that one person wrote in Puerto Rico for the geographical question. 
+Local news generally more popular than farther-out regions. Also note that one person wrote in Puerto Rico for the geographical question.
 
 ```{r echo = F}
 response_geos %>%
@@ -538,9 +568,9 @@ response_geos %>%
   labs(x = NULL, y = NULL, title = "Respondents by geographical interest")
 ```
 
-We added Food in June. Also hard coded denoms.
-
 ```{r}
+#Also hard coded denoms.
+
 eng_topic <- tibble(topic = c(str_split(read_english$Q3, ", (?=[A-Z])", simplify = T)),
                   survey = "English")
 
@@ -580,6 +610,8 @@ response_topic <- bind_rows(eng_topic, spn_topic) %>%
   calc_shares(group = topic, denom = "Total", value = value)
 ```
 
+We added Food in June so it's low now but will probably move up. Health, education, and local events continue to top this list.
+
 ```{r fig.height=6}
 response_topic %>%
   filter(!is.na(share)) %>% 
@@ -614,7 +646,11 @@ response_special_topic <- bind_rows(eng_special_topic, spn_special_topic) %>%
   pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
   group_by(survey) %>% 
   calc_shares(group = topic, denom = "Total", value = value)
+```
 
+Special topic areas being primarily focused on families makes sense with who we're surveying and how we're collecting responses.
+
+```{r}
 response_special_topic %>% 
   filter(!is.na(share)) %>% 
   mutate(topic = as.factor(topic),
@@ -658,6 +694,8 @@ trust <- tibble(national_news = as.factor(read_english$Q12),
   group_by(survey, level) %>% 
   camiller::calc_shares(group = response, denom = "total", value = value)
 ```
+
+Higher levels of trust in social circles and national news for Spanish survey respondents makes sense based on which media they use and prefer, while for English survey respondents, there's a greater level of trust in local news.
 
 ```{r fig.width=7}
 trust %>% 
@@ -709,6 +747,8 @@ beliefs <- tibble(Q1 = read_english$Q16,
   ungroup() %>% 
   filter(!is.na(share))
 ```
+
+Spanish survey respondents are more likely to agree with these statements than English survey respondents, so I wonder if there's a cultural/political association here. I find it interesting that English survey respondents *trust* local news more but are less likely to agree that it reflects their beliefs.
 
 ```{r echo = F}
 beliefs %>% 
