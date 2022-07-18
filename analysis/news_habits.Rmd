@@ -1,5 +1,5 @@
 ---
-title: "Survey summaries"
+title: "News habits"
 output: github_document
 ---
 
@@ -19,11 +19,9 @@ source("../utils/plot_utils.R")
 
 
 ```{r}
-path <- "../survey_data/06132022/"
+path <- "../survey_data/07182022/"
 plot_path <- "../distro/"
 ```
-
-### Read files
 
 ```{r}
 read_english <- read_csv(paste(path, "(English) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv", sep = "")) %>% 
@@ -44,316 +42,11 @@ read_english <- read_english %>% select(-Q1, -Q29) %>% remove_empty("rows")
 read_spanish <- read_spanish %>% select(-Q1, -Q29) %>% remove_empty("rows")
 ```
 
-Current number of respondents (blanks removed) as of June 13, 2022
+# News habits
 
-```{r}
-responses <- tibble(survey = c("English", "Spanish"),
-                    responses = c(count(read_english), count(read_spanish))) %>% 
-  mutate(responses = as.integer(responses))
+## Media used vs. Media preferred
 
-responses
-```
-## Summaries
-
-### Demographics
-
-```{r}
-response_gender <- tibble(gender = read_english$Q23,
-                          survey = as.factor("English")) %>% 
-  bind_rows(tibble(gender = read_spanish$Q23,
-                   survey = as.factor("Spanish"))) %>% 
-   mutate(gender = if_else(gender == "Hombre", "Man", gender),
-          gender = if_else(gender == "Mujer", "Woman", gender)) %>% 
-  filter(!gender %in% c("Prefiero no decir", "Prefer not to say"), !is.na(gender)) %>% 
-  tabyl(gender, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = gender, denom = "Total", value = value) %>% 
-  mutate(gender = as.factor(gender),
-         gender = fct_relevel(gender, "Total", after = Inf))
-```
-
-Respondents by gender
-
-```{r}
-response_gender %>%
-  filter(!is.na(share)) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>%
-  select(-value) %>% 
-  pivot_wider(id_cols = gender, names_from = survey, values_from = share) %>% 
-  knitr::kable()
-```
-
-```{r}
-response_age <- response_town <- tibble(age = as.factor(read_english$Q22),
-                        survey = as.factor("English")) %>% 
-  bind_rows(tibble(age = as.factor(read_spanish$Q22),
-                   survey = as.factor("Spanish"))) %>% 
-  filter(!is.na(age)) %>% 
-  mutate(age = if_else(age == "70 o mayor", "70 or older", as.character(age))) %>% 
-  filter(!age %in% c("Prefiero no decir", "Prefer not to say")) %>% 
-  mutate(age = as.factor(age),
-         age = fct_relevel(age, "Under 18", after = 0L)) %>% 
-  tabyl(age, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = age, denom = "Total", value = value)
-```
-
-It might be harder to get young people to respond based on current outreach (grocery stores, links on articles, etc.) but maybe at the PR festival? Otherwise, we do have the HS student focus group to help fill in that gap.
-
-```{r}
-response_age %>% 
-  filter(!age == "Total") %>% 
-  ggplot(aes(x = share, y = fct_rev(age))) +
-  geom_col() +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
-  geom_text(data = . %>% filter(share == 0), aes(label = "NA"), hjust = 0, color = "black") +
-  facet_grid(cols = vars(survey)) +
-  labs(title = "Respondents by age", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
-```
-
-```{r}
-response_town <- tibble(town = read_english$Q19,
-                        survey = as.factor("English")) %>% 
-  bind_rows(tibble(town = read_spanish$Q19,
-                   survey = as.factor("Spanish"))) %>% 
-  mutate(town = str_to_title(town)) %>% 
-  filter(!is.na(town)) %>% 
-  mutate(town = if_else(!grepl("Meriden|Wallingford|Southington", town), "Other", town)) %>% 
-  mutate(town = as.factor(town),
-         town = fct_relevel(town, "Meriden", "Wallingford", "Southington", "Other")) %>% 
-  tabyl(town, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = town, denom = "Total", value = value)
-```
-
-Other towns are usually 1-2 people from some other location in Connecticut. Do we want to start specifying the region around Meriden and Wallingford as opposed to like Hartford, New Haven, Waterbury, etc.
-
-```{r}
-response_town %>% 
-  filter(!town == "Total") %>% 
-  ggplot(aes(x = share, y = fct_rev(town))) +
-  geom_col() +
-  geom_text(data = . %>% filter(share > 0), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
-  geom_text(data = . %>% filter(share == 0), aes(label = "0%"), hjust = 0, color = "black") +
-  facet_grid(cols = vars(survey)) +
-  labs(title = "Respondents by town", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
-```
-
-```{r}
-response_latino <- tibble(latino = read_english$Q20,
-                 survey = as.factor("English")) %>% 
-  bind_rows(tibble(latino = read_spanish$Q20,
-                   survey = as.factor("Spanish"))) %>% 
-  filter(!is.na(latino), !latino %in% c("Prefiero no decir", "Prefer not to say")) %>% 
-  mutate(latino = if_else(latino == "Sí", "Yes", latino)) %>% 
-  tabyl(latino, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = latino, denom = "Total", value = value)
-```
-
-Most respondents are Latino
-
-```{r}
-response_latino %>%
-  filter(!is.na(share)) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>%
-  select(-value) %>% 
-  pivot_wider(id_cols = latino, names_from = survey, values_from = share) %>% 
-  knitr::kable()
-```
-
-Birthplace is an open text field, need to sort around for common words
-
-```{r}
-response_birthplace <- tibble(place = read_english$Q21,
-                              survey = as.factor("English")) %>% 
-  bind_rows(tibble(place = read_spanish$Q21,
-                   survey = as.factor("Spanish"))) %>% 
-  filter(!is.na(place), place != "No") %>% 
-  mutate(clean = str_to_upper(place)) %>% 
-  mutate(clean = if_else(grepl("PUER", clean), "PUERTO RICO", clean),
-         clean = if_else(grepl("AMERICA|MERIDEN|US|USA|UNITED", clean), "USA", clean),
-         clean = if_else(grepl("REPUB", clean), "DOMINICAN REPUBLIC", clean)) %>% 
-  mutate(clean = if_else(!clean %in% c("USA", "PUERTO RICO", "DOMINICAN REPUBLIC", "ECUADOR", "MEXICO"), "OTHER", clean)) %>% 
-  mutate(clean = as.factor(clean),
-         clean = fct_relevel(clean, "OTHER", after = Inf)) %>% 
-  select(-place) %>% 
-  tabyl(clean, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = clean, denom = "Total", value = value)
-```
-
-```{r}
-response_birthplace %>% 
-  filter(!clean == "Total") %>% 
-  ggplot(aes(x = share, y = fct_rev(clean))) +
-  geom_col() +
-  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
-  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black") +
-  facet_grid(cols = vars(survey)) +
-  labs(title = "Respondents by birthplace", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
-```
-
-```{r}
-response_lang_at_home <- tibble(lang = read_english$Q24,
-                              survey = as.factor("English")) %>% 
-  bind_rows(tibble(lang = read_spanish$Q24,
-                   survey = as.factor("Spanish"))) %>% 
-  filter(!is.na(lang)) %>% 
-  mutate(lang = if_else(grepl("Ambos|Spanglish", lang), "Both English and Spanish", lang),
-         lang = if_else(lang == "Español", "Spanish", lang),
-         lang = if_else(!lang %in% c("English", "Spanish", "Both English and Spanish"), "Other", lang)) %>% 
-  mutate(lang = as.factor(lang),
-         lang = fct_relevel(lang, "English", "Both English and Spanish", "Spanish", "Other")) %>% 
-  tabyl(lang, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = lang, denom = "Total", value = value)
-```
-
-Other languages for Spanish survey were "dialect" (I'm not sure which so I put it in other), for English survey: German, Polish, Marathi.
-
-```{r}
-response_lang_at_home %>% 
-  filter(!is.na(share)) %>% 
-  ggplot(aes(x = lang, y = share, group = survey)) +
-  geom_col(position = position_dodge()) +
-  geom_text(data = . %>% filter(share >.1), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.1) +
-  geom_text(data = . %>% filter(share <=.1), aes(label = scales::percent(share, accuracy = 1)), vjust = -.1, color = "black") +
-  facet_grid(rows = vars(survey), switch = "y") +
-  labs(title = "Respondents by language spoken at home", x = NULL, y = NULL) +
-  theme(axis.text.y.left = element_blank())
-```
-
-```{r}
-response_web_at_home <- tibble(internet = as.factor(read_english$Q27),
-                           survey = as.factor("English")) %>% 
-  bind_rows(tibble(internet = as.factor(read_spanish$Q27),
-                   survey = as.factor("Spanish"))) %>% 
-  mutate(internet = fct_collapse(internet, Yes = c("Yes", "Sí"))) %>% 
-  filter(!is.na(internet)) %>% 
-  tabyl(internet, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = internet, denom = "Total", value = value)
-```
-
-Even though most people have the internet at home, fewer Spanish survey respondents do, which might lend towards them preferring text, word of mouth, etc. for news.
-
-```{r}
-response_web_at_home %>%
-  filter(!is.na(share)) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>%
-  select(-value) %>% 
-  pivot_wider(id_cols = internet, names_from = survey, values_from = share) %>% 
-  knitr::kable()
-```
-
-```{r}
-response_device <- tibble(device = read_english$Q26,
-                          survey = as.factor("English")) %>% 
-  bind_rows(tibble(device = read_spanish$Q26,
-                   survey = as.factor("Spanish"))) %>% 
-  filter(!is.na(device), device != "Prefer not to say") %>% 
-  mutate(device = as.factor(device),
-         device = fct_collapse(device, Yes = c("Yes", "Sí"))) %>% 
-  tabyl(device, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = device, denom = "Total", value = value)
-```
-
-Similar trends in device access. I would like to be able to disaggregate this by age in the future.
-
-```{r}
-response_device %>%
-  filter(!is.na(share)) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>%
-  select(-value) %>% 
-  pivot_wider(id_cols = device, names_from = survey, values_from = share) %>% 
-  knitr::kable()
-```
-
-```{r}
-response_voter <- tibble(registered = as.factor(read_english$Q28),
-       survey = as.factor("English")) %>% 
-  bind_rows(tibble(registered = as.factor(read_spanish$Q28),
-                   survey = as.factor("Spanish"))) %>% 
-   filter(!is.na(registered)) %>% 
-  mutate(registered = fct_collapse(registered, Yes = c("Yes", "Sí"), `Prefer not to say` = c("Prefer no to say", "Prefiero no decir"), `Not sure` = c("Not sure", "No estoy seguro/a"))) %>% 
-  tabyl(registered, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = registered, denom = "Total", value = value)
-```
-
-Voter registration status may be complicated by citizenship status, since so many Spanish language respondents were born abroad.
-
-```{r}
-response_voter %>% 
-  filter(!is.na(share)) %>% 
-  ggplot(aes(x = registered, y = share, group = survey)) +
-  geom_col(position = position_dodge()) +
-  geom_text(data = . %>% filter(share >.1), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.1) +
-  geom_text(data = . %>% filter(share <=.1), aes(label = scales::percent(share, accuracy = 1)), vjust = -.1, color = "black") +
-  facet_grid(rows = vars(survey), switch = "y") +
-  labs(title = "Respondents by voter registration status", x = NULL, y = NULL) +
-  theme(axis.text.y.left = element_blank())
-```
-
-```{r}
-response_details <- tibble(indicator = read_english$Q25,
-                           survey = as.factor("English")) %>% 
-  bind_rows(tibble(indicator = read_spanish$Q25,
-                   survey = as.factor("Spanish"))) %>% 
-  filter(!is.na(indicator)) %>% 
-  mutate(indicator = if_else(grepl("stu", indicator), "Student", indicator),
-         indicator = if_else(grepl("18", indicator), "Parent", indicator),
-         indicator = if_else(grepl("business|empresa", indicator), "Business owner", indicator),
-         indicator = if_else(grepl("None|Ninguno", indicator), "None of these", indicator)) %>% 
-  mutate(indicator = as.factor(indicator),
-         indicator = fct_relevel(indicator, "None of these", after = Inf)) %>% 
-  tabyl(indicator, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = indicator, denom = "Total", value = value)
-```
-
-Lots of parents which makes sense given the grocery store outreach. Fewer students among the Spanish language survey probably related to fewer young people responding.
-
-```{r}
-response_details %>% 
-  filter(!indicator == "Total") %>% 
-  ggplot(aes(x = share, y = fct_rev(indicator))) +
-  geom_col() +
-  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
-  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black") +
-  facet_grid(cols = vars(survey)) +
-  labs(title = "Respondents by demographic detail", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
-```
-
-### News habits
-
-I broke these into two charts by survey language so we can compare what medium they prefer to which they use more easily.
+I broke these into two charts by survey language and age so we can compare what medium they prefer to which they use more easily.
 
 ```{r}
 response_mode <- tibble(use_mode = as.factor(read_english$Q9),
@@ -393,14 +86,15 @@ mode_to_plot <- response_mode %>%
   calc_shares(group = mode, denom = "Total", value = value)
 ```
 
-For English language respondents, there's a greater preference than use for Email, Text, and news apps, which I think suggest that people prefer more of a digest style news update. TV and social media are popular, too. Again, I want to disaggregate this by age in the future.
+For English language respondents, there's a greater preference than use for Email, Text, and news apps, which I think suggest that people prefer more of a digest style news update. TV and social media are popular, of course. Again, I want to disaggregate this by age in the future.
 
 ```{r}
 mode_to_plot %>% 
   filter(survey == "English") %>% 
+  mutate(share = round(share, 2)) %>% 
   filter(!is.na(share)) %>% 
   ggplot(aes(x = type, y = share, group = mode)) +
-  geom_col(aes(fill = type), position = position_dodge(.9), width = .7) +
+  geom_col(aes(fill = type), position = position_dodge(.6), width = .5) +
   geom_text(data = . %>% filter(share <= .05), aes(label = scales::percent(share, accuracy = 1)), vjust = -.2, color = "black") +
   geom_text(data = . %>% filter(share > .05), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
   facet_wrap(~mode) +
@@ -417,7 +111,7 @@ mode_to_plot %>%
   filter(survey == "Spanish") %>% 
   filter(!is.na(share)) %>% 
   ggplot(aes(x = type, y = share, group = mode)) +
-  geom_col(aes(fill = type), position = position_dodge(.9), width = .7) +
+  geom_col(aes(fill = type), position = position_dodge(.6), width = .5) +
   geom_text(data = . %>% filter(share <= .05), aes(label = scales::percent(share, accuracy = 1)), vjust = -.2, color = "black") +
   geom_text(data = . %>% filter(share > .05), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
   facet_wrap(~mode) +
@@ -438,13 +132,16 @@ pref_lang <- tibble(tv_video = read_english$Q6,
                    survey = as.factor("Spanish"))) %>% 
   mutate(tv_video = if_else(grepl("Inglés", tv_video), "English", tv_video),
          tv_video = if_else(grepl("Español", tv_video), "Spanish", tv_video),
-         tv_video = if_else(grepl("Ambos", tv_video), "Both English and Spanish", tv_video)) %>% 
+         tv_video = if_else(grepl("Ambos", tv_video), "Both English and Spanish", tv_video),
+         tv_video = if_else(grepl("Otro", tv_video), "Other", tv_video)) %>% 
   mutate(radio_audio = if_else(grepl("Inglés", radio_audio), "English", radio_audio),
          radio_audio = if_else(grepl("Español", radio_audio), "Spanish", radio_audio),
-         radio_audio = if_else(grepl("Ambos", radio_audio), "Both English and Spanish", radio_audio)) %>% 
+         radio_audio = if_else(grepl("Ambos", radio_audio), "Both English and Spanish", radio_audio),
+         radio_audio = if_else(grepl("Otro", radio_audio), "Other", radio_audio)) %>% 
   mutate(print = if_else(grepl("Inglés", print), "English", print),
          print = if_else(grepl("Español", print), "Spanish", print),
-         print = if_else(grepl("Ambos", print), "Both English and Spanish", print))
+         print = if_else(grepl("Ambos", print), "Both English and Spanish", print),
+         print = if_else(grepl("Otro", print), "Other", print))
 
 pref_lang_to_plot <- pref_lang %>%
   select(survey, language = tv_video) %>%
@@ -480,7 +177,7 @@ pref_lang_to_plot %>%
   geom_text(data = . %>% filter(share <= 0.1), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = -.2, color = "grey20") +
   guides(fill = guide_legend(title = NULL)) +
   facet_grid(rows = vars(survey), cols = vars(type), scales = "free_y", switch = "y") +
-  scale_fill_manual(values = unname(qual_pal[c("violet", "cyan", "pink")])) +
+  scale_fill_manual(values = unname(qual_pal[c("violet", "cyan", "pink", "teal")])) +
   theme(legend.position = "bottom",
         axis.text.x = element_blank(),
         axis.text.y = element_blank()) +
@@ -547,7 +244,7 @@ response_geos <- bind_rows(eng_geo, spn_geo) %>%
   mutate(geo = str_to_title(geo)) %>% 
   filter(!is.na(geo)) %>% 
   tabyl(geo, survey) %>% 
-  add_row(geo = "Total", English = 83, Spanish  = 99) %>% 
+  add_row(geo = "Total", English = 192, Spanish  = 255) %>% 
   pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
   group_by(survey) %>% 
   calc_shares(group = geo, denom = "Total", value = value)
@@ -558,6 +255,7 @@ Local news generally more popular than farther-out regions. Also note that one p
 ```{r echo = F}
 response_geos %>%
   filter(!is.na(share)) %>% 
+  filter(geo %in% c("Local", "State", "Regional", "National", "International")) %>% 
   mutate(geo = as.factor(geo),
          geo = fct_relevel(geo, "Local", "State", "Regional", "National", "International")) %>% 
   ggplot(aes(x = geo, y = share)) +
@@ -604,7 +302,7 @@ response_topic <- bind_rows(eng_topic, spn_topic) %>%
          topic = str_replace(topic, "community", "comm.")) %>% 
   tabyl(topic, survey) %>% 
   filter(topic != "None") %>% 
-  add_row(topic = "Total", English = 83, Spanish  = 99) %>% 
+  add_row(topic = "Total", English = 192, Spanish  = 255) %>% 
   pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
   group_by(survey) %>% 
   calc_shares(group = topic, denom = "Total", value = value)
@@ -642,7 +340,7 @@ response_special_topic <- bind_rows(eng_special_topic, spn_special_topic) %>%
          topic = if_else(grepl("Participacion", topic), "Community engagement", topic)) %>%
   filter(!topic %in% c("None of these", "No", "Ninguno de estos")) %>% 
   tabyl(topic, survey) %>% 
-  add_row(topic = "Total", English = 83, Spanish  = 99) %>% 
+  add_row(topic = "Total", English = 192, Spanish  = 255) %>% 
   pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
   group_by(survey) %>% 
   calc_shares(group = topic, denom = "Total", value = value)

@@ -1,7 +1,7 @@
 #remove email addresses but keep the field
 library(tidyverse)
 path <- "survey_data/"
-date <- "06132022/"
+date <- "07182022/"
 eng <- "(English) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv"
 spn <- "(Spanish) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv"
 
