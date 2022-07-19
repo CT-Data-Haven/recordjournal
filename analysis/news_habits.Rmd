@@ -407,7 +407,7 @@ response_topic <- bind_rows(eng_topic_list1, eng_topic_list2, spn_topic_list1, s
   ungroup()
 ```
 
-**interpret**
+Over and under 40 for the English langauge survey have the same top 5 or so topics of interest, but younger people are more interested in Music/Arts/Culture where older people are more interested in Health or Education. Still about half of respondents in both age groups have an interest in those three as well as Local Businesses and Local Events.
 
 ```{r fig.height=6}
 response_topic %>% 
@@ -420,7 +420,7 @@ response_topic %>%
   theme(axis.text.x = element_blank())
 ```
 
-**interpret**
+Health and Education top the list for Spanish survey respondents in both age groups. For younger people, the next three are Sports, Politics, and Music/Arts/Culture. For older people it's Community Resources, Music/Arts/Culture, and Local Events.
 
 ```{r fig.height=6}
 response_topic %>% 

@@ -46,11 +46,18 @@ that one person wrote in Puerto Rico for the geographical question.
 
 ## Topics
 
-**interpret**
+Over and under 40 for the English langauge survey have the same top 5 or
+so topics of interest, but younger people are more interested in
+Music/Arts/Culture where older people are more interested in Health or
+Education. Still about half of respondents in both age groups have an
+interest in those three as well as Local Businesses and Local Events.
 
 ![](news_habits_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
-**interpret**
+Health and Education top the list for Spanish survey respondents in both
+age groups. For younger people, the next three are Sports, Politics, and
+Music/Arts/Culture. For older people it’s Community Resources,
+Music/Arts/Culture, and Local Events.
 
 ![](news_habits_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 

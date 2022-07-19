@@ -116,8 +116,8 @@ response_age %>%
   filter(!is.na(share)) %>% 
   ggplot(aes(x = share, y = fct_rev(age))) +
   geom_col() +
-  geom_text(data = . %>% filter(share >= .02), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
-  geom_text(data = . %>% filter(share < .02), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black") +
+  geom_text(data = . %>% filter(share >= .02), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1, size =4) +
+  geom_text(data = . %>% filter(share < .02), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black", size =4) +
   facet_grid(cols = vars(survey)) +
   labs(title = "Respondents by age", x = NULL, y = NULL) +
   theme(axis.text.x = element_blank())
@@ -212,8 +212,8 @@ response_birthplace %>%
   mutate(clean = str_to_title(clean)) %>% 
   ggplot(aes(x = share, y = reorder(clean, share))) +
   geom_col() +
-  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
-  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black") +
+  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1, size =4) +
+  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black", size =4) +
   facet_grid(cols = vars(survey)) +
   labs(title = "Respondents by birthplace", x = NULL, y = NULL) +
   theme(axis.text.x = element_blank())
@@ -246,8 +246,8 @@ response_lang_at_home %>%
   filter(!is.na(share)) %>% 
   ggplot(aes(x = lang, y = share, group = survey)) +
   geom_col(position = position_dodge()) +
-  geom_text(data = . %>% filter(share >.1), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.1) +
-  geom_text(data = . %>% filter(share <=.1), aes(label = scales::percent(share, accuracy = 1)), vjust = -.1, color = "black") +
+  geom_text(data = . %>% filter(share >.1), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.1, size =4) +
+  geom_text(data = . %>% filter(share <=.1), aes(label = scales::percent(share, accuracy = 1)), vjust = -.1, color = "black", size =4) +
   facet_grid(rows = vars(survey), switch = "y") +
   labs(title = "Respondents by language spoken at home", x = NULL, y = NULL) +
   theme(axis.text.y.left = element_blank())
@@ -313,7 +313,7 @@ response_device_age %>%
   filter(device == "No") %>% 
   ggplot(aes(x = age, y = share)) +
   geom_col() +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.1) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2, size = 4) +
   facet_grid(cols = vars(survey)) +
   labs(title = "No internet-enabled device, by age group and survey", y = NULL) +
   theme(axis.text.y = element_blank())
@@ -373,8 +373,8 @@ response_details %>%
   filter(!indicator %in% c("Total", "None of these")) %>% 
   ggplot(aes(x = share, y = fct_rev(indicator))) +
   geom_col() +
-  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
-  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black") +
+  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1, size =4) +
+  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black", size =4) +
   facet_grid(cols = vars(survey)) +
   labs(title = "Respondents by demographic detail", x = NULL, y = NULL) +
   theme(axis.text.x = element_blank())
