@@ -1,0 +1,216 @@
+---
+title: "Trust in news media"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+library(tidyverse)
+library(cwi)
+library(janitor)
+library(camiller)
+source("../utils/plot_utils.R")
+
+#Cannot just re-run this! some denoms are hard-coded for non-response, and there's some text mining
+```
+
+```{r}
+path <- "../survey_data/07182022/"
+plot_path <- "../distro/"
+```
+
+```{r}
+read_english <- read_csv(paste(path, "(English) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv", sep = "")) %>% 
+  clean_names()
+
+read_spanish <- read_csv(paste(path, "(Spanish) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv", sep = "")) %>% 
+  clean_names()
+
+qhead_eng <- tibble(question = paste("Q", 1:31, sep = ""),
+                    label = colnames(read_english))
+qhead_spn <- tibble(question = paste("Q", 1:31, sep = ""),
+                    label = colnames(read_spanish))
+
+colnames(read_english) <- qhead_eng$question
+colnames(read_spanish) <- qhead_eng$question
+
+read_english <- read_english %>%
+  select(-Q29) %>%
+  rename(id = Q1) %>%
+  remove_empty("rows")
+
+read_spanish <- read_spanish %>% 
+  select(-Q29) %>% 
+  rename(id = Q1) %>%
+  remove_empty("rows")
+```
+
+```{r}
+age <- tibble(id = read_english$id,
+              age = as.factor(read_english$Q22),
+              survey = as.factor("English")) %>% 
+  bind_rows(tibble(id = read_spanish$id,
+                   age = as.factor(read_spanish$Q22),
+                   survey = as.factor("Spanish"))) %>% 
+  filter(!is.na(age)) %>% 
+  mutate(age = if_else(age == "70 o mayor", "70 or older", as.character(age)),
+         age = if_else(age == "Menor de 18", "Under 18", age)) %>% 
+  filter(!age %in% c("Prefiero no decir", "Prefer not to say")) %>% 
+  mutate(age = as.factor(age),
+         age = fct_relevel(age, "Under 18", after = 0L)) %>% 
+  mutate(age = fct_collapse(age, under_40 = c("Under 18", "18-29", "30-39"), over_40 = c("40-49", "50-59", "60-69", "70 or older")))
+```
+
+```{r}
+denoms <- tibble(survey = c(rep("English", 2), rep("Spanish", 2)),
+                 age = c("under_40", "over_40", "under_40", "over_40"),
+                 total = c(75, 112, 91, 152))
+
+trust <- tibble(id = read_english$id,
+                national_news = as.factor(read_english$Q12),
+                local_news = as.factor(read_english$Q13),
+                social_media = as.factor(read_english$Q14),
+                social_circle = as.factor(read_english$Q15),
+                survey = as.factor("English")) %>% 
+  bind_rows(tibble(id = read_spanish$id,
+                   national_news = as.factor(read_spanish$Q12),
+                   local_news = as.factor(read_spanish$Q13),
+                   social_media = as.factor(read_spanish$Q14),
+                   social_circle = as.factor(read_spanish$Q15),
+                   survey = as.factor("Spanish"))) %>% 
+  pivot_longer(cols = national_news:social_circle, names_to = "level", values_to = "response") %>% 
+  mutate(response = fct_collapse(response, `A lot` = c("A lot", "Mucho"),
+                                 Some = c("Some", "Un poco"),
+                                 `Not at all` = c("Not at all", "Para nada"))) %>% 
+  left_join(age, by = c("survey", "id")) %>% 
+  select(-id) %>% 
+  group_by(age, survey, level, response) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(!is.na(age), !is.na(response)) %>% 
+  pivot_wider(id_cols = c("survey", "age", "level"), names_from = "response", values_from = "n") %>% 
+  rowwise() %>% 
+  mutate(total = sum(`A lot` + Some + `Not at all`)) %>% 
+  pivot_longer(cols = `A lot`:total, names_to = "response", values_to = "value") %>% 
+  mutate(level = str_replace(level, "_", " "),
+         level = str_to_sentence(level)) %>% 
+  group_by(age, survey, level) %>% 
+  camiller::calc_shares(group = response, denom = "total", value = value)
+```
+
+Higher levels of trust in social circles and national news for Spanish survey respondents makes sense based on which media they use and prefer, while for English survey respondents, there's a greater level of trust in local news.
+
+```{r fig.width=7}
+trust %>% 
+  filter(survey == "English") %>% 
+  filter(!is.na(share)) %>% 
+  mutate(response = fct_relevel(response, "A lot", "Some", "Not at all"),
+         response = fct_rev(response),
+         level = as.factor(level),
+         level = fct_relevel(level, "National news", "Local news", "Social media", "Social circle"),
+         level = fct_rev(level)) %>% 
+  ggplot(aes(x = share, y = level, fill = response)) +
+  geom_col(position = position_stack(.5), width = .8) +
+  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  facet_grid(cols = vars(age)) +
+  scale_fill_manual(values = rev(opinion_pal)) +
+  guides(fill = guide_legend(title = "Trust in source:", reverse = T)) +
+  theme(axis.text.x = element_blank(),
+        legend.position = "bottom") +
+  labs(x = NULL, y = NULL, title = str_wrap("Share of respondents who trust news sources by age, English language respondents", 70))
+```
+
+```{r fig.width=7}
+trust %>% 
+  filter(survey == "Spanish") %>% 
+  filter(!is.na(share)) %>% 
+  mutate(response = fct_relevel(response, "A lot", "Some", "Not at all"),
+         response = fct_rev(response),
+         level = as.factor(level),
+         level = fct_relevel(level, "National news", "Local news", "Social media", "Social circle"),
+         level = fct_rev(level)) %>% 
+  ggplot(aes(x = share, y = level, fill = response)) +
+  geom_col(position = position_stack(.5), width = .8) +
+  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  facet_grid(cols = vars(age)) +
+  scale_fill_manual(values = rev(opinion_pal)) +
+  guides(fill = guide_legend(title = "Trust in source:", reverse = T)) +
+  theme(axis.text.x = element_blank(),
+        legend.position = "bottom") +
+  labs(x = NULL, y = NULL, title = str_wrap("Share of respondents who trust news sources by age, Spanish language respondents", 70))
+```
+
+## Beliefs
+
+```{r}
+labels <- tibble(code = c("Q1", "Q2", "Q3"), 
+            question = c("I trust the sources of news I get about my community", "The local news covers issues that are important to me", "The local news reflects my beliefs and customs"))
+                         
+beliefs <- tibble(id = read_english$id, 
+                  Q1 = read_english$Q16,
+                Q2 = read_english$Q17,
+                Q3 = read_english$Q18,
+                survey = as.factor("English")) %>% 
+  bind_rows(tibble(id = read_spanish$id,
+                   Q1 = read_spanish$Q16,
+                   Q2 = read_spanish$Q17,
+                   Q3 = read_spanish$Q18,
+                   survey = as.factor("Spanish"))) %>% 
+  pivot_longer(cols = Q1:Q3, names_to = "code", values_to = "response") %>% 
+  mutate(response = if_else(response == "De acuerdo", "Agree", response),
+         response = if_else(response == "En desacuerdo", "Disagree", response)) %>% 
+  left_join(age, by = c("survey", "id")) %>% 
+  select(-id) %>% 
+  group_by(age, survey, code, response) %>% 
+  count() %>% 
+  ungroup() %>% 
+  left_join(labels, by = "code") %>% 
+  select(-code) %>% 
+  filter(!is.na(age), !is.na(response)) %>% 
+  pivot_wider(id_cols = c("survey", "question", "age"), names_from = "response", values_from = "n") %>% 
+  rowwise() %>% 
+  mutate(total = sum(Agree + Disagree + Neutral, na.rm = T)) %>% 
+  pivot_longer(cols = Agree:total, names_to = "response", values_to = "value") %>% 
+  group_by(age, survey, question) %>% 
+  camiller::calc_shares(group = response, denom = "total", value = value) %>% 
+  ungroup()
+```
+
+Spanish survey respondents are more likely to agree with these statements than English survey respondents, so I wonder if there's a cultural/political association here. I find it interesting that English survey respondents *trust* local news more but are less likely to agree that it reflects their beliefs.
+
+```{r echo = F}
+beliefs %>% 
+  filter(survey == "English") %>% 
+  mutate(response = as.factor(response),
+         response = fct_relevel(response, "Agree", "Neutral", "Disagree"),
+         response = fct_rev(response)) %>% 
+  ggplot(aes(x = share, y = str_wrap(question, 25), fill = response)) +
+  geom_col(position = position_stack(), width = .8) +
+  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  facet_grid(cols = vars(age)) +
+  scale_fill_manual(values = rev(opinion_pal)) +
+  guides(fill = guide_legend(title = NULL, reverse = T)) +
+  theme(axis.text.x = element_blank(),
+        legend.position = "bottom") +
+  labs(x = NULL, y = NULL, title = str_wrap("Share of English survey respondents agreeing with statements regarding trust in local news, by age", 70))
+```
+
+```{r echo = F}
+beliefs %>% 
+  filter(survey == "Spanish") %>% 
+  mutate(response = as.factor(response),
+         response = fct_relevel(response, "Agree", "Neutral", "Disagree"),
+         response = fct_rev(response)) %>% 
+  ggplot(aes(x = share, y = str_wrap(question, 25), fill = response)) +
+  geom_col(position = position_stack(), width = .8) +
+  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  facet_grid(cols = vars(age)) +
+  scale_fill_manual(values = rev(opinion_pal)) +
+  guides(fill = guide_legend(title = NULL, reverse = T)) +
+  theme(axis.text.x = element_blank(),
+        legend.position = "bottom") +
+  labs(x = NULL, y = NULL, title = str_wrap("Share of Spanish survey respondents agreeing with statements regarding trust in local news, by age", 70))
+```
