@@ -18,7 +18,7 @@ source("../utils/plot_utils.R")
 ```
 
 ```{r}
-path <- "../survey_data/07182022/"
+path <- "../survey_data/08302022/"
 plot_path <- "../distro/"
 ```
 
@@ -37,15 +37,39 @@ qhead_spn <- tibble(question = paste("Q", 1:31, sep = ""),
 colnames(read_english) <- qhead_eng$question
 colnames(read_spanish) <- qhead_eng$question
 
-read_english <- read_english %>%
-  select(-Q29) %>%
-  rename(id = Q1) %>%
-  remove_empty("rows")
+read_english <- read_english %>% select(-Q29, -Q30) %>% remove_empty("rows")
+read_spanish <- read_spanish %>% select(-Q29, -Q30) %>% remove_empty("rows")
+```
 
-read_spanish <- read_spanish %>% 
-  select(-Q29) %>% 
-  rename(id = Q1) %>%
-  remove_empty("rows")
+Add PR festival data, hard code paths since it won't change, bind to primary surveys.
+
+Just realized I deleted an entire section from the English PR Festival survey... I'll summarize what we have for the Spanish respondents, but the questions were those about what content they'd like to see.
+
+```{r}
+read_english_pr <- read_csv("../survey_data/08302022/(English - PR) RJ Latino Communities Reporting Lab Survey 2 2.csv") %>% 
+  clean_names() %>% 
+  mutate(`are_you_interested_in_news_at_the_following_geographical_levels_select_all_that_apply` = NA,
+         `which_of_these_topics_interest_you_most_select_up_to_five` = NA,
+         `do_any_of_these_special_stories_interest_you_select_all_that_apply` = NA,
+         `are_there_any_specific_stories_you_would_like_to_see_more_of_in_local_news_for_example_investigative_articles_business_profiles_opinion_columns_cartoons_etc` = NA) %>% 
+  select(timestamp, `are_you_interested_in_news_at_the_following_geographical_levels_select_all_that_apply`, `which_of_these_topics_interest_you_most_select_up_to_five`, `do_any_of_these_special_stories_interest_you_select_all_that_apply`, `are_there_any_specific_stories_you_would_like_to_see_more_of_in_local_news_for_example_investigative_articles_business_profiles_opinion_columns_cartoons_etc`, everything())
+
+read_spanish_pr <- read_csv("../survey_data/08302022/(Spanish - PR) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses.csv") %>% 
+  clean_names()
+
+qhead_eng_pr <- tibble(question = paste("Q", 1:29, sep = ""),
+                    label = colnames(read_english_pr))
+qhead_spn_pr <- tibble(question = paste("Q", 1:29, sep = ""),
+                    label = colnames(read_spanish_pr))
+
+colnames(read_english_pr) <- qhead_spn_pr$question
+colnames(read_spanish_pr) <- qhead_spn_pr$question
+
+read_english_pr <- read_english_pr %>% remove_empty("rows")
+read_spanish_pr <- read_spanish_pr %>% remove_empty("rows")
+
+read_english <- read_english %>% bind_rows(read_english_pr) %>% rename(id = Q1)
+read_spanish <- read_spanish %>% bind_rows(read_spanish_pr) %>% rename(id = Q1)
 ```
 
 ```{r}
@@ -67,7 +91,7 @@ age <- tibble(id = read_english$id,
 ```{r}
 denoms <- tibble(survey = c(rep("English", 2), rep("Spanish", 2)),
                  age = c("under_40", "over_40", "under_40", "over_40"),
-                 total = c(75, 112, 91, 152))
+                 total = c(169, 265, 190, 351))
 
 trust <- tibble(id = read_english$id,
                 national_news = as.factor(read_english$Q12),
@@ -101,9 +125,9 @@ trust <- tibble(id = read_english$id,
   camiller::calc_shares(group = response, denom = "total", value = value)
 ```
 
-Both age groups for the English survey seem to trust local news while being mostly ambivalent about the other sources. Older adults have more trust in national news.
+Both age groups for the English survey seem to trust local news while being mostly ambivalent about the other sources. Older adults have more trust in national news. Social media is the least trusted.
 
-```{r fig.width=7}
+```{r fig.width=6}
 trust %>% 
   filter(survey == "English") %>% 
   filter(!is.na(share)) %>% 
@@ -125,7 +149,7 @@ trust %>%
 
 Higher levels of trust among Spanish respondents, with national news topping the list. I'd still call this a tossup overall.
 
-```{r fig.width=7}
+```{r fig.width=6}
 trust %>% 
   filter(survey == "Spanish") %>% 
   filter(!is.na(share)) %>% 
@@ -181,7 +205,7 @@ beliefs <- tibble(id = read_english$id,
   ungroup()
 ```
 
-Still interesting that about half of younger English survey respondents trust local news but don't agree with these statements... mismatch in preferred coverage while thinking the existing coverage is accurate?
+Still interesting that about half of younger English survey respondents trust local news but don't agree with these statements... mismatch in preferred coverage while thinking the existing coverage is accurate? Majorities of the over-40 crowd of English respondents trust sources of local news and feel it's covers issues important to them, but don't necessarily agree the news reflects their own beliefs.
 
 ```{r echo = F}
 beliefs %>% 
@@ -200,7 +224,7 @@ beliefs %>%
   labs(x = NULL, y = NULL, title = str_wrap("Share of English survey respondents agreeing with statements regarding trust in local news, by age", 70))
 ```
 
-Generally higher levels of agreement here, but still a tossup for younger respondents. Thinking about topics, younger populations seemed to want more arts/culture and events where older adults were interested in big topics like health or education. 
+Generally higher levels of agreement here, but still a tossup for younger respondents. Thinking about topics, younger populations seemed to want more arts/culture and events where older adults were interested in big topics like health or education. Still the majority of both age groups believe the local news covers issues important to them.
 
 ```{r echo = F}
 beliefs %>% 

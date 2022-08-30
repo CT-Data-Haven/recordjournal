@@ -19,7 +19,7 @@ source("../utils/plot_utils.R")
 
 
 ```{r}
-path <- "../survey_data/07182022/"
+path <- "../survey_data/08302022/"
 plot_path <- "../distro/"
 ```
 
@@ -38,11 +38,42 @@ qhead_spn <- tibble(question = paste("Q", 1:31, sep = ""),
 colnames(read_english) <- qhead_eng$question
 colnames(read_spanish) <- qhead_eng$question
 
-read_english <- read_english %>% select(-Q1, -Q29) %>% remove_empty("rows")
-read_spanish <- read_spanish %>% select(-Q1, -Q29) %>% remove_empty("rows")
+read_english <- read_english %>% select(-Q1, -Q29, -Q30) %>% remove_empty("rows")
+read_spanish <- read_spanish %>% select(-Q1, -Q29, -Q30) %>% remove_empty("rows")
 ```
 
-Current number of respondents (blanks removed) as of July 18, 2022.
+Add PR festival data, hard code paths since it won't change, bind to primary surveys.
+
+Just realized I deleted an entire section from the English PR Festival survey... I'll summarize what we have for the Spanish respondents, but the questions were those about what content they'd like to see.
+
+```{r}
+read_english_pr <- read_csv("../survey_data/08302022/(English - PR) RJ Latino Communities Reporting Lab Survey 2 2.csv") %>% 
+  clean_names() %>% 
+  mutate(`are_you_interested_in_news_at_the_following_geographical_levels_select_all_that_apply` = NA,
+         `which_of_these_topics_interest_you_most_select_up_to_five` = NA,
+         `do_any_of_these_special_stories_interest_you_select_all_that_apply` = NA,
+         `are_there_any_specific_stories_you_would_like_to_see_more_of_in_local_news_for_example_investigative_articles_business_profiles_opinion_columns_cartoons_etc` = NA) %>% 
+  select(timestamp, `are_you_interested_in_news_at_the_following_geographical_levels_select_all_that_apply`, `which_of_these_topics_interest_you_most_select_up_to_five`, `do_any_of_these_special_stories_interest_you_select_all_that_apply`, `are_there_any_specific_stories_you_would_like_to_see_more_of_in_local_news_for_example_investigative_articles_business_profiles_opinion_columns_cartoons_etc`, everything())
+
+read_spanish_pr <- read_csv("../survey_data/08302022/(Spanish - PR) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses.csv") %>% 
+  clean_names()
+
+qhead_eng_pr <- tibble(question = paste("Q", 1:29, sep = ""),
+                    label = colnames(read_english_pr))
+qhead_spn_pr <- tibble(question = paste("Q", 1:29, sep = ""),
+                    label = colnames(read_spanish_pr))
+
+colnames(read_english_pr) <- qhead_spn_pr$question
+colnames(read_spanish_pr) <- qhead_spn_pr$question
+
+read_english_pr <- read_english_pr %>% select(-Q1) %>% remove_empty("rows")
+read_spanish_pr <- read_spanish_pr %>% select(-Q1) %>% remove_empty("rows")
+
+read_english <- read_english %>% bind_rows(read_english_pr)
+read_spanish <- read_spanish %>% bind_rows(read_spanish_pr)
+```
+
+Current number of respondents (blanks removed) as of August 30, 2022.
 
 ```{r}
 responses <- tibble(survey = c("English", "Spanish"),
@@ -65,7 +96,8 @@ response_gender <- tibble(gender = read_english$Q23,
   bind_rows(tibble(gender = read_spanish$Q23,
                    survey = as.factor("Spanish"))) %>% 
    mutate(gender = if_else(gender == "Hombre", "Man", gender),
-          gender = if_else(gender == "Mujer", "Woman", gender)) %>% 
+          gender = if_else(gender == "Mujer", "Woman", gender),
+          gender = if_else(gender == "Transgénero", "Transgender", gender)) %>% 
   filter(!gender %in% c("Prefiero no decir", "Prefer not to say"), !is.na(gender)) %>% 
   tabyl(gender, survey) %>% 
   adorn_totals("row") %>% 
@@ -142,7 +174,7 @@ response_town <- tibble(town = read_english$Q19,
   calc_shares(group = town, denom = "Total", value = value)
 ```
 
-I only want to show the names of towns where 10+ respondents live. Right now that's only Meriden and Wallingford. Middletown and Waterbury are getting up there, though.
+The vast majority are still in Meriden and Wallingford but now we also have a couple from Mass and several other towns around CT.
 
 ```{r}
 response_town %>% 
@@ -190,9 +222,10 @@ response_birthplace <- tibble(place = read_english$Q21,
   filter(!is.na(place), place != "No") %>% 
   mutate(clean = str_to_upper(place)) %>% 
   mutate(clean = if_else(grepl("PUER|P.R|PR", clean), "PUERTO RICO", clean),
-         clean = if_else(grepl("AMERICA|MERIDEN|US|USA|UNITED|U.S.|CT|NEW YORK", clean), "USA", clean),
+         clean = if_else(grepl("AMERICA|MERIDEN|US|USA|UNITED|U.S|CT|NEW YORK|EEUU|ESTADO|COUNTY|CHICAGO|CALIFORNIA|NEW HAVEN", clean), "USA", clean),
          clean = if_else(grepl("REPUB", clean), "DOMINICAN REPUBLIC", clean),
-         clean = if_else(grepl("MEX|GUANA", clean), "MEXICO", clean)) %>% 
+         clean = if_else(grepl("MEX|GUANA", clean), "MEXICO", clean),
+         clean = if_else(grepl("ECUADOR", clean), "ECUADOR", clean)) %>% 
   mutate(clean = if_else(!clean %in% c("USA", "PUERTO RICO", "DOMINICAN REPUBLIC", "ECUADOR", "MEXICO"), "OTHER", clean)) %>% 
   mutate(clean = as.factor(clean),
          clean = fct_relevel(clean, "OTHER", after = Inf)) %>% 
@@ -256,10 +289,11 @@ response_lang_at_home %>%
 ### Internet-enabled devices and internet at home
 
 ```{r}
-response_web_at_home <- tibble(internet = as.factor(read_english$Q27),
+response_web_at_home <- tibble(internet = read_english$Q27,
                            survey = as.factor("English")) %>% 
-  bind_rows(tibble(internet = as.factor(read_spanish$Q27),
+  bind_rows(tibble(internet = read_spanish$Q27,
                    survey = as.factor("Spanish"))) %>% 
+  filter(!internet %in% c("Prefiero no decir", "Prefer not to say")) %>% 
   mutate(internet = fct_collapse(internet, Yes = c("Yes", "Sí"))) %>% 
   filter(!is.na(internet)) %>% 
   tabyl(internet, survey) %>% 
