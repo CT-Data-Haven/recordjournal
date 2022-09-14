@@ -41,14 +41,14 @@ they do, that would be helpful.
 
 Preferred sources is also an open text field. Mining for a word cloud…
 
-![](news_habits_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](news_habits_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->![](news_habits_files/figure-gfm/unnamed-chunk-13-2.png)<!-- -->
 
 ## Geographic scope
 
 Local news generally more popular than farther-out regions. Also note
 that one person wrote in Puerto Rico for the geographical question.
 
-![](news_habits_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](news_habits_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 ## Topics
 
@@ -56,18 +56,18 @@ Over and under 40 for the English language survey have the same top 5 or
 so topics of interest with Education, Music/Arts/Culture, and Health
 topping the lists.
 
-![](news_habits_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](news_habits_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 Health and Education top the list for Spanish survey respondents in both
 age groups. For younger people, the next three are Sports, Politics, and
 Music/Arts/Culture. For older people it’s Sports, Music/Arts/Culture,
 and Local Events.
 
-![](news_habits_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](news_habits_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 ## Special topics
 
 Special topic areas being primarily focused on families makes sense with
 who we’re surveying and how we’re collecting responses.
 
-![](news_habits_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](news_habits_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->

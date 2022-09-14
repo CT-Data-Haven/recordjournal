@@ -1,9 +1,9 @@
 #remove email addresses but keep the field
 library(tidyverse)
 path <- "survey_data/"
-date <- "08302022/"
-eng <- "(English) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv"
-spn <- "(Spanish) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv"
+date <- "09142022/"
+eng <- "(English) RJ Latino Communities Reporting Lab Survey.csv"
+spn <- "(Spanish) RJ Latino Communities Reporting Lab Survey.csv"
 
 read_eng <- read_csv(file = paste(path, date, eng, sep = ""))
 

@@ -12,8 +12,8 @@ Current number of respondents (blanks removed) as of August 30, 2022.
 
 | survey  | responses |
 |:--------|----------:|
-| English |       438 |
-| Spanish |       549 |
+| English |       474 |
+| Spanish |       629 |
 
 This time around there are a couple English language respondents who
 have issue with Latino-focused media. I’ve removed those responses from
@@ -28,10 +28,10 @@ Respondents by gender
 
 | gender                           | English | Spanish |
 |:---------------------------------|:--------|:--------|
-| Man                              | 37%     | 42%     |
+| Man                              | 38%     | 42%     |
 | Non-binary/Gender non-conforming | 0%      | 0%      |
 | Transgender                      | 0%      | 0%      |
-| Woman                            | 62%     | 58%     |
+| Woman                            | 62%     | 57%     |
 
 ### Age
 
@@ -51,9 +51,9 @@ have a couple from Mass and several other towns around CT.
 
 | town        | English | Spanish |
 |:------------|:--------|:--------|
-| Meriden     | 66%     | 70%     |
-| Wallingford | 11%     | 13%     |
-| Other       | 24%     | 17%     |
+| Meriden     | 65%     | 66%     |
+| Wallingford | 10%     | 14%     |
+| Other       | 24%     | 20%     |
 
 ### Ethnicity
 
@@ -61,8 +61,8 @@ Most respondents are Latino
 
 | latino | English | Spanish |
 |:-------|:--------|:--------|
-| No     | 38%     | 1%      |
-| Yes    | 62%     | 99%     |
+| No     | 37%     | 0%      |
+| Yes    | 63%     | 100%    |
 
 ### Place of birth
 
@@ -88,8 +88,8 @@ mouth, etc. for news.
 
 | internet | English | Spanish |
 |:---------|:--------|:--------|
-| No       | 5%      | 12%     |
-| Yes      | 95%     | 88%     |
+| No       | 5%      | 11%     |
+| Yes      | 95%     | 89%     |
 
 ![](demographics_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
@@ -100,9 +100,9 @@ so many Spanish language respondents were born abroad.
 
 | registered                 | English | Spanish |
 |:---------------------------|:--------|:--------|
-| No                         | 17%     | 50%     |
+| No                         | 18%     | 52%     |
 | Not sure/Prefer not to say | 6%      | 5%      |
-| Yes                        | 78%     | 44%     |
+| Yes                        | 76%     | 43%     |
 
 ### Other demographic details
 

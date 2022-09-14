@@ -18,27 +18,27 @@ source("../utils/plot_utils.R")
 ```
 
 ```{r}
-path <- "../survey_data/08302022/"
+path <- "../survey_data/09142022/"
 plot_path <- "../distro/"
 ```
 
 ```{r}
-read_english <- read_csv(paste(path, "(English) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv", sep = "")) %>% 
+read_english <- read_csv(paste(path, "(English) RJ Latino Communities Reporting Lab Survey.csv", sep = "")) %>% 
   clean_names()
 
-read_spanish <- read_csv(paste(path, "(Spanish) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses 1.csv", sep = "")) %>% 
+read_spanish <- read_csv(paste(path, "(Spanish) RJ Latino Communities Reporting Lab Survey.csv", sep = "")) %>% 
   clean_names()
 
-qhead_eng <- tibble(question = paste("Q", 1:31, sep = ""),
+qhead_eng <- tibble(question = paste("Q", 1:32, sep = ""),
                     label = colnames(read_english))
-qhead_spn <- tibble(question = paste("Q", 1:31, sep = ""),
+qhead_spn <- tibble(question = paste("Q", 1:32, sep = ""),
                     label = colnames(read_spanish))
 
 colnames(read_english) <- qhead_eng$question
 colnames(read_spanish) <- qhead_eng$question
 
-read_english <- read_english %>% select(-Q29, -Q30) %>% remove_empty("rows")
-read_spanish <- read_spanish %>% select(-Q29, -Q30) %>% remove_empty("rows")
+read_english <- read_english %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
+read_spanish <- read_spanish %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
 ```
 
 Add PR festival data, hard code paths since it won't change, bind to primary surveys.
@@ -356,9 +356,9 @@ ggplot(cloud_over40, aes(label = source, size = n+3, color = n)) +
 ```{r}
 #Denoms are hard-coded so we get share of respondents, not share of responses
 
-eng_geo <- tibble(geo = c(str_split(read_english$Q2, ", ", simplify = T)),
+eng_geo <- tibble(geo = c(str_split(read_english$Q2, ";", simplify = T)),
                   survey = "English")
-spn_geo <- tibble(geo = c(str_split(read_spanish$Q2, ", ", simplify = T)),
+spn_geo <- tibble(geo = c(str_split(read_spanish$Q2, ";", simplify = T)),
                   survey = "Spanish")
 
 response_geos <- bind_rows(eng_geo, spn_geo) %>% 
@@ -370,7 +370,7 @@ response_geos <- bind_rows(eng_geo, spn_geo) %>%
   mutate(geo = str_to_title(geo)) %>% 
   filter(!is.na(geo)) %>% 
   tabyl(geo, survey) %>% 
-  add_row(geo = "Total", English = 443, Spanish  = 550) %>% 
+  add_row(geo = "Total", English = 482, Spanish  = 630) %>% 
   pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
   group_by(survey) %>% 
   calc_shares(group = geo, denom = "Total", value = value)
@@ -421,22 +421,22 @@ spn_topics_over40 <- read_spanish %>%
   filter(age == "over_40") %>% 
   select(Q3)
 
-eng_topic_list1 <- tibble(topic = c(str_split(eng_topics_under40$Q3, ", (?=[A-Z])", simplify = T)),
+eng_topic_list1 <- tibble(topic = c(str_split(eng_topics_under40$Q3, ";(?=[A-Z])", simplify = T)),
                          age = "under_40",
                          survey = "English")
-eng_topic_list2 <- tibble(topic = c(str_split(eng_topics_over40$Q3, ", (?=[A-Z])", simplify = T)),
+eng_topic_list2 <- tibble(topic = c(str_split(eng_topics_over40$Q3, ";(?=[A-Z])", simplify = T)),
                          age = "over_40",
                          survey = "English")
-spn_topic_list1 <- tibble(topic = c(str_split(spn_topics_under40$Q3, ", (?=[A-Z])", simplify = T)),
+spn_topic_list1 <- tibble(topic = c(str_split(spn_topics_under40$Q3, ";(?=[A-Z])", simplify = T)),
                          age = "under_40",
                          survey = "Spanish")
-spn_topic_list2 <- tibble(topic = c(str_split(spn_topics_over40$Q3, ", (?=[A-Z])", simplify = T)),
+spn_topic_list2 <- tibble(topic = c(str_split(spn_topics_over40$Q3, ";(?=[A-Z])", simplify = T)),
                          age = "over_40",
                          survey = "Spanish")
 
 denoms <- tibble(survey = c(rep("English", 2), rep("Spanish", 2)),
                  age = c("under_40", "over_40", "under_40", "over_40"),
-                 total = c(169, 265, 190, 351))
+                 total = c(182, 284, 222, 399))
 
 response_topic <- bind_rows(eng_topic_list1, eng_topic_list2, spn_topic_list1, spn_topic_list2) %>%
   filter(!is.na(age)) %>% 
@@ -503,10 +503,10 @@ response_topic %>%
 ## Special topics
 
 ```{r}
-eng_special_topic <- tibble(topic = c(str_split(read_english$Q4, ", (?=[A-Z])", simplify = T)),
+eng_special_topic <- tibble(topic = c(str_split(read_english$Q4, ";(?=[A-Z])", simplify = T)),
                     survey = "English") %>% 
   mutate(topic = str_remove(topic, "Topics related to "))
-spn_special_topic <- tibble(topic = c(str_split(read_spanish$Q4, ", (?=[A-Z])", simplify = T)),
+spn_special_topic <- tibble(topic = c(str_split(read_spanish$Q4, ";(?=[A-Z])", simplify = T)),
                     survey = "Spanish") %>% 
   mutate(topic = str_remove(topic, "Temas acerca de "))
 
@@ -522,7 +522,7 @@ response_special_topic <- bind_rows(eng_special_topic, spn_special_topic) %>%
   filter(!topic %in% c("None of these", "No", "Ninguno de estos")) %>% 
   filter(!grepl("subscribe", topic)) %>% 
   tabyl(topic, survey) %>% 
-  add_row(topic = "Total", English = 443, Spanish  = 550) %>% 
+  add_row(topic = "Total", English = 482, Spanish  = 630) %>% 
   pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
   group_by(survey) %>% 
   calc_shares(group = topic, denom = "Total", value = value)
