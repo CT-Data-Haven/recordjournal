@@ -270,13 +270,20 @@ pref_lang_to_plot %>%
 Preferred sources is also an open text field. Mining for a word cloud...
 
 ```{r}
-eng_list <- str_split(read_english$Q10, ",| y | and | or|\\/|  ", simplify = T)
-spn_list <- str_split(read_spanish$Q10, ",| y | and | or|\\/|  ", simplify = T)
+eng_under40 <- read_english %>% left_join(age, by = "id") %>% filter(age == "under_40")
+spn_under40 <- read_spanish %>% left_join(age, by = "id") %>% filter(age == "under_40")
+eng_over40 <- read_english %>% left_join(age, by = "id") %>% filter(age == "over_40")
+spn_over40 <- read_spanish %>% left_join(age, by = "id") %>% filter(age == "over_40")
+```
 
-add_back <- tibble(source = c("FACEBOOK", "GOOGLE", "HARTFORD COURANT", "TELEMUNDO", "WFSB", "TELEFE INTERNATIONAL", "RECORD-JOURNAL", "FACEBOOK", "HARTFORD COURANT", "CT POST", "WTNH", "TELEMUNDO", "CNN", "INSTAGRAM", "INSTAGRAM"))
+```{r}
+eng_list_under40 <- str_split(eng_under40$Q10, ",| y | and | or|\\/|  ", simplify = T)
+spn_list_under40 <- str_split(spn_under40$Q10, ",| y | and | or|\\/|  ", simplify = T)
+
+# add_back <- tibble(source = c("FACEBOOK", "GOOGLE", "HARTFORD COURANT", "TELEMUNDO", "WFSB", "TELEFE INTERNATIONAL", "RECORD-JOURNAL", "FACEBOOK", "HARTFORD COURANT", "CT POST", "WTNH", "TELEMUNDO", "CNN", "INSTAGRAM", "INSTAGRAM"))
                               
                               
-x <- tibble(source = c(spn_list, eng_list)) %>% 
+x <- tibble(source = c(spn_list_under40, eng_list_under40)) %>% 
   filter(!is.na(source), source != "") %>% 
   mutate(source = str_to_upper(source)) %>%
   mutate(source = str_trim(source, side = "both")) %>% 
@@ -294,7 +301,34 @@ x <- tibble(source = c(spn_list, eng_list)) %>%
          source = if_else(grepl("UNIV", source), "UNIVISION", source)) %>% 
   mutate(source = str_trim(source, side = "both"))
 
-cloud <- x %>% group_by(source) %>% count()
+cloud_under40 <- x %>% group_by(source) %>% count()
+
+eng_list_over40 <- str_split(eng_over40$Q10, ",| y | and | or|\\/|  ", simplify = T)
+spn_list_over40 <- str_split(spn_over40$Q10, ",| y | and | or|\\/|  ", simplify = T)
+
+# add_back <- tibble(source = c("FACEBOOK", "GOOGLE", "HARTFORD COURANT", "TELEMUNDO", "WFSB", "TELEFE INTERNATIONAL", "RECORD-JOURNAL", "FACEBOOK", "HARTFORD COURANT", "CT POST", "WTNH", "TELEMUNDO", "CNN", "INSTAGRAM", "INSTAGRAM"))
+                              
+                              
+y <- tibble(source = c(spn_list_over40, eng_list_over40)) %>% 
+  filter(!is.na(source), source != "") %>% 
+  mutate(source = str_to_upper(source)) %>%
+  mutate(source = str_trim(source, side = "both")) %>% 
+  mutate(source = str_remove(source,  c(" IF AVAILABLE| PRINT EDITION"))) %>% 
+  # filter(!source %in% c("N", "A", "FACEBOOK GOOGLE", "HARTFORD COURANT TELEMUNDO WFSB 3 TELEFE INTERNATIONAL", "RECORD JOURNAL FACEBOOK", "HARTFORD COURANT CT POST WTNH", "TODO", "TODOS", "UN POCO DE TODO", "USUALLY TELEMUNDO", "NONE", "CNN E INSTAGRAM", "IG")) %>% #will add these back properly below
+  mutate(source = if_else(grepl("RECORD|RJ|R-J", source), "RECORD-JOURNAL", source),
+         source = if_else(grepl("NBC|CHANNEL 30", source), "NBC", source),
+         source = if_else(grepl("FOX", source), "FOX NEWS", source),
+         source = if_else(grepl("CHANNEL 8", source), "WTNH", source),
+         source = if_else(grepl("CHANNEL 3|CHANEL 3|WFSB", source), "WFSB", source),
+         source = if_else(grepl("BREAK", source), "NEWSBREAK", source),
+         source = if_else(grepl("LOCAL", source), "LOCAL STATIONS", source),
+         source = if_else(grepl("HEARALD", source), "NEW BRITAIN HERALD", source),
+         source = if_else(grepl("WAPO", source), "WASHINGTON POST", source),
+         source = if_else(grepl("UNIV", source), "UNIVISION", source)) %>% 
+  mutate(source = str_trim(source, side = "both"))
+
+cloud_over40 <- y %>% group_by(source) %>% count()
+
 ```
 
 ```{r}
@@ -302,11 +336,19 @@ library(ggwordcloud)
 
 set.seed(13)
 
-ggplot(cloud, aes(label = source, size = n+3, color = n)) +
+ggplot(cloud_under40, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7])
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by people under 40")
+
+ggplot(cloud_over40, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by people over 40")
 ```
 
 ## Geographic scope
