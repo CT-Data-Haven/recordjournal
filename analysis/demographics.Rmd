@@ -19,7 +19,7 @@ source("../utils/plot_utils.R")
 
 
 ```{r}
-path <- "../survey_data/09142022/"
+path <- "../survey_data/11082022/"
 plot_path <- "../distro/"
 ```
 
@@ -38,13 +38,9 @@ qhead_spn <- tibble(question = paste("Q", 1:32, sep = ""),
 colnames(read_english) <- qhead_eng$question
 colnames(read_spanish) <- qhead_eng$question
 
-read_english <- read_english %>% select(-Q1, -Q29, -Q30, -Q31) %>% remove_empty("rows")
-read_spanish <- read_spanish %>% select(-Q1, -Q29, -Q30, -Q31) %>% remove_empty("rows")
+read_english <- read_english %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
+read_spanish <- read_spanish %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
 ```
-
-Add PR festival data, hard code paths since it won't change, bind to primary surveys.
-
-Just realized I deleted an entire section from the English PR Festival survey... I'll summarize what we have for the Spanish respondents, but the questions were those about what content they'd like to see.
 
 ```{r}
 read_english_pr <- read_csv("../survey_data/08302022/(English - PR) RJ Latino Communities Reporting Lab Survey 2 2.csv") %>% 
@@ -66,58 +62,44 @@ qhead_spn_pr <- tibble(question = paste("Q", 1:29, sep = ""),
 colnames(read_english_pr) <- qhead_spn_pr$question
 colnames(read_spanish_pr) <- qhead_spn_pr$question
 
-read_english_pr <- read_english_pr %>% select(-Q1) %>% remove_empty("rows")
-read_spanish_pr <- read_spanish_pr %>% select(-Q1) %>% remove_empty("rows")
+read_english_pr <- read_english_pr %>% remove_empty("rows")
+read_spanish_pr <- read_spanish_pr %>% remove_empty("rows")
 
-read_english <- read_english %>% bind_rows(read_english_pr)
-read_spanish <- read_spanish %>% bind_rows(read_spanish_pr)
+read_english <- read_english %>% bind_rows(read_english_pr) %>% rename(id = Q1)
+read_spanish <- read_spanish %>% bind_rows(read_spanish_pr) %>% rename(id = Q1)
 ```
 
-Current number of respondents (blanks removed) as of August 30, 2022.
+```{r}
+age <- tibble(id = read_english$id,
+              age = as.factor(read_english$Q22),
+              survey = as.factor("English")) %>% 
+  bind_rows(tibble(id = read_spanish$id,
+                   age = as.factor(read_spanish$Q22),
+                   survey = as.factor("Spanish"))) %>% 
+  filter(!is.na(age)) %>% 
+  mutate(age = if_else(age == "70 o mayor", "70 or older", as.character(age)),
+         age = if_else(age == "Menor de 18", "Under 18", age)) %>% 
+  filter(!age %in% c("Prefiero no decir", "Prefer not to say")) %>% 
+  mutate(age = as.factor(age),
+         age = fct_relevel(age, "Under 18", after = 0L)) %>% 
+  mutate(age = fct_collapse(age, age00_29 = c("Under 18", "18-29"), age30_49 = c("30-39", "40-49"),  age50_99 = c("50-59", "60-69", "70 or older")))
+```
+
+Current number of respondents (blanks removed) as of November 8, 2022.
+
+**I'm going to stop disaggregating by survey type so we can focus on disaggregating by other metrics, like age, gender, or nationality**
 
 ```{r}
+###HARD CODED DENOM
 responses <- tibble(survey = c("English", "Spanish"),
                     responses = c(count(read_english), count(read_spanish))) %>% 
-  mutate(responses = as.integer(responses))
+  mutate(responses = as.integer(responses)) %>% 
+  add_row(survey = "Total", responses = 1648)
 
 responses %>% knitr::kable()
 ```
 
-This time around there are a couple English language respondents who have issue with Latino-focused media. I've removed those responses from here because it's either a hateful write-in or not a real response to the question. In another notebook, I'll provide the open text responses.
-
-
 # Demographics
-
-### Gender
-
-```{r}
-response_gender <- tibble(gender = read_english$Q23,
-                          survey = as.factor("English")) %>% 
-  bind_rows(tibble(gender = read_spanish$Q23,
-                   survey = as.factor("Spanish"))) %>% 
-   mutate(gender = if_else(gender == "Hombre", "Man", gender),
-          gender = if_else(gender == "Mujer", "Woman", gender),
-          gender = if_else(gender == "Transgénero", "Transgender", gender)) %>% 
-  filter(!gender %in% c("Prefiero no decir", "Prefer not to say"), !is.na(gender)) %>% 
-  tabyl(gender, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = gender, denom = "Total", value = value) %>% 
-  mutate(gender = as.factor(gender),
-         gender = fct_relevel(gender, "Total", after = Inf))
-```
-
-Respondents by gender
-
-```{r}
-response_gender %>%
-  filter(!is.na(share)) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>%
-  select(-value) %>% 
-  pivot_wider(id_cols = gender, names_from = survey, values_from = share) %>% 
-  knitr::kable()
-```
 
 ### Age
 
@@ -132,30 +114,61 @@ response_age <- response_town <- tibble(age = as.factor(read_english$Q22),
   filter(!age %in% c("Prefiero no decir", "Prefer not to say")) %>% 
   mutate(age = as.factor(age),
          age = fct_relevel(age, "Under 18", after = 0L)) %>% 
-  tabyl(age, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = age, denom = "Total", value = value)
+  select(-survey) %>% 
+  group_by(age) %>% 
+  count()
 ```
 
-It might be harder to get young people to respond based on current outreach (grocery stores, links on articles, etc.) but maybe at the PR festival? Otherwise, we do have the HS student focus group to help fill in that gap.
-
-I'm going to use under 40/over 40 for age disaggregation.
+This time around, I'll group ages into 0-29, 30-49, and 50+
 
 ```{r}
 response_age %>% 
-  filter(!is.na(share)) %>% 
-  ggplot(aes(x = share, y = fct_rev(age))) +
+  ggplot(aes(x = age, y = n)) +
   geom_col() +
-  geom_text(data = . %>% filter(share >= .02), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1, size =4) +
-  geom_text(data = . %>% filter(share < .02), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black", size =4) +
-  facet_grid(cols = vars(survey)) +
+  geom_text(aes(label = n), vjust = 1.2) +
   labs(title = "Respondents by age", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
+  theme(axis.text.y = element_blank())
+```
+
+### Gender x age
+
+```{r}
+response_gender <- tibble(id = read_english$id,
+                          gender = read_english$Q23,
+                          survey = as.factor("English")) %>% 
+  bind_rows(tibble(id = read_spanish$id,
+                   gender = read_spanish$Q23,
+                   survey = as.factor("Spanish"))) %>% 
+   mutate(gender = if_else(gender == "Hombre", "Man", gender),
+          gender = if_else(gender == "Mujer", "Woman", gender),
+          gender = if_else(grepl("Non-binary", gender), "Transgender & NB", gender),
+          gender = if_else(gender %in% c("Transgénero", "Transgender"), "Transgender & NB", gender)) %>% 
+  filter(!gender %in% c("Prefiero no decir", "Prefer not to say"), !is.na(gender)) %>% 
+  mutate(gender = as.factor(gender) %>% fct_relevel(., "Woman", "Man", "Transgender & NB")) %>% 
+  left_join(age, by = c("survey", "id")) %>% 
+  select(-id, -survey) %>% 
+  filter(!is.na(age)) %>% 
+  group_by(age, gender) %>% 
+  count() %>% 
+  ungroup()
+```
+
+Across all age groups, more women than men responding, with greatest disparity in 30-49 range. Keep that in mind as we look at these age-based breakdowns later.
+
+```{r}
+response_gender %>% 
+  ggplot(aes(x = age, y = n, group = gender)) +
+  geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
+  geom_text(aes(label = n), position = position_dodge(.9), vjust = -.2, color = "grey20") +
+  scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow", "red")])) +
+  theme(legend.position = "bottom",
+        axis.text.y = element_blank()) +
+  labs(x = NULL, y = NULL, title = "Respondents by gender and age")
 ```
 
 ### Town of residence
+
+Someone asked to show the top 5 towns
 
 ```{r}
 response_town <- tibble(town = read_english$Q19,
@@ -164,52 +177,69 @@ response_town <- tibble(town = read_english$Q19,
                    survey = as.factor("Spanish"))) %>% 
   mutate(town = str_to_title(town)) %>% 
   filter(!is.na(town)) %>% 
-  mutate(town = if_else(!grepl("Meriden|Wallingford", town), "Other", town)) %>% 
-  mutate(town = as.factor(town),
-         town = fct_relevel(town, "Meriden", "Wallingford", "Other")) %>% 
-  tabyl(town, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = town, denom = "Total", value = value)
+  select(-survey) %>% 
+  mutate(town = if_else(!town %in% c("Meriden", "Wallingford", "New Haven", "Waterbury", "Hartford"), "All others", town)) %>% 
+  group_by(town) %>% 
+  count() %>% 
+  ungroup()
 ```
-
-The vast majority are still in Meriden and Wallingford but now we also have a couple from Mass and several other towns around CT.
 
 ```{r}
 response_town %>% 
-  filter(!town == "Total") %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>% 
-  pivot_wider(id_cols = town, names_from = "survey", values_from = "share") %>% 
-  knitr::kable()
-
+  ggplot(aes(x = n, y = reorder(town, n))) +
+  geom_col() +
+  geom_text(aes(label = n), hjust = 1.2) +
+  labs(title = "Respondents by town of residence (top 5 towns shown)", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank())
 ```
 
+### Ethnicity x gender x age
+
 ```{r}
-response_latino <- tibble(latino = read_english$Q20,
-                 survey = as.factor("English")) %>% 
-  bind_rows(tibble(latino = read_spanish$Q20,
-                   survey = as.factor("Spanish"))) %>% 
+##HARD CODED DENOMS
+response_latino <- tibble(id = read_english$id,
+                          latino = read_english$Q20,
+                          gender = read_english$Q23) %>% 
+  bind_rows(tibble(id = read_spanish$id,
+                   latino = read_spanish$Q20,
+                   gender = read_spanish$Q23)) %>% 
   filter(!is.na(latino), !latino %in% c("Prefiero no decir", "Prefer not to say")) %>% 
   mutate(latino = if_else(latino == "Sí", "Yes", latino)) %>% 
-  tabyl(latino, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = latino, denom = "Total", value = value)
+  mutate(gender = if_else(gender == "Hombre", "Man", gender),
+          gender = if_else(gender == "Mujer", "Woman", gender),
+          gender = if_else(grepl("Non-binary", gender), "Transgender & NB", gender),
+          gender = if_else(gender %in% c("Transgénero", "Transgender"), "Transgender & NB", gender)) %>% 
+  filter(!gender %in% c("Prefiero no decir", "Prefer not to say"), !is.na(gender)) %>% 
+  left_join(age, by = c("id")) %>% 
+  filter(!is.na(age)) %>% 
+  group_by(age, gender, latino) %>% 
+  count() %>% 
+  ungroup() %>% 
+  add_row(age = "age00_29", gender = "Woman", latino = "Total", n = 155) %>% 
+  add_row(age = "age00_29", gender = "Man", latino = "Total", n = 109) %>% 
+  add_row(age = "age00_29", gender = "Transgender & NB", latino = "Total", n = 5) %>% 
+  add_row(age = "age30_49", gender = "Woman", latino = "Total", n = 467) %>% 
+  add_row(age = "age30_49", gender = "Man", latino = "Total", n = 269) %>% 
+  add_row(age = "age30_49", gender = "Transgender & NB", latino = "Total", n = 2) %>% 
+  add_row(age = "age50_99", gender = "Woman", latino = "Total", n = 317) %>%
+  add_row(age = "age50_99", gender = "Man", latino = "Total", n = 239) %>%
+    mutate(gender = as.factor(gender) %>% fct_relevel(., "Woman", "Man", "Transgender & NB")) %>% 
+  group_by(age, gender) %>% 
+  calc_shares(group = latino, denom = "Total", value = n)
 ```
 
-### Ethnicity
-
-Most respondents are Latino
+Slightly lower shares identifying as Latino in older populations
 
 ```{r}
-response_latino %>%
-  filter(!is.na(share)) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>%
-  select(-value) %>% 
-  pivot_wider(id_cols = latino, names_from = survey, values_from = share) %>% 
-  knitr::kable()
+response_latino %>% 
+  filter(!is.na(share), latino == "Yes", gender != "Transgender & NB") %>% 
+  ggplot(aes(x = age, y = share, group = gender)) +
+  geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
+  scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow")])) +
+  labs(title = "Share of respondents who identify as Latino/Latina/Latinx", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts (7 total)") +
+  theme(axis.text.y = element_blank(),
+        legend.position = "bottom")
 ```
 
 ### Place of birth
@@ -236,8 +266,6 @@ response_birthplace <- tibble(place = read_english$Q21,
   group_by(survey) %>% 
   calc_shares(group = clean, denom = "Total", value = value)
 ```
-
-"Other" includes Argentina, Bangladesh, Brazil, Chile, Colombia, Costa Rica, Cuba, Germany, Ghana, Guatemala, Haiti, Honduras, India, Jamaica, Liberia, Morocco, Panama, Peru, Poland, Spain, Venezuela...
 
 ```{r}
 response_birthplace %>% 
@@ -272,8 +300,6 @@ response_lang_at_home <- tibble(lang = read_english$Q24,
   calc_shares(group = lang, denom = "Total", value = value)
 ```
 
-Other languages for Spanish survey were "dialect" and Portuguese, for English survey: Polish, Marathi, Portuguese, Bengali, Bangala, and Portuguese.
-
 ```{r}
 response_lang_at_home %>% 
   filter(!is.na(share)) %>% 
@@ -302,8 +328,6 @@ response_web_at_home <- tibble(internet = read_english$Q27,
   group_by(survey) %>% 
   calc_shares(group = internet, denom = "Total", value = value)
 ```
-
-Even though most people have the internet at home, fewer Spanish survey respondents do, which might lend towards them preferring text, word of mouth, etc. for news.
 
 ```{r}
 response_web_at_home %>%
@@ -369,8 +393,6 @@ response_voter <- tibble(registered = as.factor(read_english$Q28),
   calc_shares(group = registered, denom = "Total", value = value)
 ```
 
-Voter registration status may be affected by citizenship status, since so many Spanish language respondents were born abroad.
-
 ```{r}
 response_voter %>% 
   filter(!is.na(share)) %>% 
@@ -399,8 +421,6 @@ response_details <- tibble(indicator = read_english$Q25,
   group_by(survey) %>% 
   calc_shares(group = indicator, denom = "Total", value = value)
 ```
-
-Lots of parents which makes sense given the grocery store outreach. Fewer students among the Spanish language survey probably related to fewer young people responding.
 
 ```{r}
 response_details %>% 
