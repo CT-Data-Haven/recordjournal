@@ -40,31 +40,43 @@ Slightly lower shares identifying as Latino in older populations
 
 ![](demographics_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
-### Place of birth
+### Place of birth x age
+
+Adults ages 30-49 more likely than other age groups to have been born
+abroad.
 
 ![](demographics_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
-### Language spoken at home
+### Language spoken at home x age
 
 ![](demographics_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
-### Internet-enabled devices and internet at home
+### Internet-enabled devices and internet at home x age
 
-| internet | English | Spanish |
-|:---------|:--------|:--------|
-| No       | 5%      | 10%     |
-| Yes      | 95%     | 90%     |
+![](demographics_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 ![](demographics_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
 ### Registered voter
 
-| registered                 | English | Spanish |
-|:---------------------------|:--------|:--------|
-| No                         | 19%     | 53%     |
-| Not sure/Prefer not to say | 5%      | 7%      |
-| Yes                        | 76%     | 40%     |
+![](demographics_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
 
-### Other demographic details
+## Other demographic details
 
-![](demographics_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
+76 business owners out of 1648 responses is pretty low (\<5% of
+respondents), 11% are students, 40% are parents. I’ll only break this
+down by age.
+
+    ## # A tibble: 4 × 2
+    ##   indicator          n
+    ##   <fct>          <int>
+    ## 1 Business owner    76
+    ## 2 Parent           663
+    ## 3 Student          189
+    ## 4 None of these    678
+
+Half of the respondents under 30 are students, more than 2/3s of the
+respondents 30-49 are parents, and just slightly more of the respondents
+over 50 are business owners.
+
+![](demographics_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->

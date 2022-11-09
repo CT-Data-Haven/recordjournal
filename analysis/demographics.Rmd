@@ -242,50 +242,69 @@ response_latino %>%
         legend.position = "bottom")
 ```
 
-### Place of birth
+### Place of birth x age
 
 ```{r}
-response_birthplace <- tibble(place = read_english$Q21,
+response_birthplace <- tibble(id = read_english$id,
+                              place = read_english$Q21,
                               survey = as.factor("English")) %>% 
-  bind_rows(tibble(place = read_spanish$Q21,
+  bind_rows(tibble(id = read_spanish$id,
+                   place = read_spanish$Q21,
                    survey = as.factor("Spanish"))) %>% 
   filter(!is.na(place), place != "No") %>% 
   mutate(clean = str_to_upper(place)) %>% 
   mutate(clean = if_else(grepl("PUER|P.R|PR", clean), "PUERTO RICO", clean),
          clean = if_else(grepl("AMERICA|MERIDEN|US|USA|UNITED|U.S|CT|NEW YORK|EEUU|ESTADO|COUNTY|CHICAGO|CALIFORNIA|NEW HAVEN", clean), "USA", clean),
-         clean = if_else(grepl("REPUB", clean), "DOMINICAN REPUBLIC", clean),
+         clean = if_else(grepl("REPUB|DR", clean), "DOMINICAN REPUBLIC", clean),
          clean = if_else(grepl("MEX|GUANA", clean), "MEXICO", clean),
          clean = if_else(grepl("ECUADOR", clean), "ECUADOR", clean)) %>% 
   mutate(clean = if_else(!clean %in% c("USA", "PUERTO RICO", "DOMINICAN REPUBLIC", "ECUADOR", "MEXICO"), "OTHER", clean)) %>% 
   mutate(clean = as.factor(clean),
-         clean = fct_relevel(clean, "OTHER", after = Inf)) %>% 
-  select(-place) %>% 
-  tabyl(clean, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = clean, denom = "Total", value = value)
+         clean = fct_relevel(clean, "USA", "PUERTO RICO", "ECUADOR", "MEXICO", "DOMINICAN REPUBLIC", "OTHER")) %>% 
+  left_join(age, by = c("survey", "id")) %>% 
+  select(-place, -survey, -id) %>% 
+  group_by(age, clean) %>% 
+  count() %>% 
+  filter(!is.na(age)) %>% 
+  ungroup()
+
+pobtot <- response_birthplace %>% 
+  mutate(clean = "TOTAL") %>% 
+  group_by(age, clean) %>% 
+  summarise(n = sum(n)) %>% 
+  ungroup()
+
+response_birthplace <- response_birthplace %>% 
+  bind_rows(pobtot) %>% 
+  group_by(age) %>% 
+  calc_shares(group = clean, denom = "TOTAL", value = n)
 ```
+
+Adults ages 30-49 more likely than other age groups to have been born abroad.
 
 ```{r}
 response_birthplace %>% 
-  filter(!clean == "Total") %>% 
-  mutate(clean = str_to_title(clean)) %>% 
-  ggplot(aes(x = share, y = reorder(clean, share))) +
-  geom_col() +
-  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1, size =4) +
-  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black", size =4) +
-  facet_grid(cols = vars(survey)) +
-  labs(title = "Respondents by birthplace", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
+  mutate(age = fct_rev(age),
+         clean = fct_rev(clean)) %>% 
+  ggplot(aes(x = share, y = age, group = clean)) +
+  geom_col(aes(fill = clean), width = .8, position = position_stack(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  guides(fill = guide_legend(title = "Place of birth", reverse = T)) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  scale_fill_manual(values = unname(qual_pal[c("pink", "yellow", "teal", "cyan", "violet", "gray")])) +
+  labs(x = NULL, y = NULL, title = "Respondents by age and place of birth",
+       caption = "PR and USA may not be mutually exclusive")
 ```
 
-### Language spoken at home
+### Language spoken at home x age
 
 ```{r}
-response_lang_at_home <- tibble(lang = read_english$Q24,
+response_lang_at_home <- tibble(id = read_english$id, 
+                                lang = read_english$Q24,
                               survey = as.factor("English")) %>% 
-  bind_rows(tibble(lang = read_spanish$Q24,
+  bind_rows(tibble(id = read_spanish$id, 
+                   lang = read_spanish$Q24,
                    survey = as.factor("Spanish"))) %>% 
   filter(!is.na(lang)) %>% 
   mutate(lang = if_else(grepl("Ambos|Spanglish", lang), "Both English and Spanish", lang),
@@ -293,120 +312,169 @@ response_lang_at_home <- tibble(lang = read_english$Q24,
          lang = if_else(!lang %in% c("English", "Spanish", "Both English and Spanish"), "Other", lang)) %>% 
   mutate(lang = as.factor(lang),
          lang = fct_relevel(lang, "English", "Both English and Spanish", "Spanish", "Other")) %>% 
-  tabyl(lang, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = lang, denom = "Total", value = value)
+  left_join(age, by = c("survey", "id")) %>% 
+  select(-survey, -id) %>% 
+  group_by(age, lang) %>% 
+  count() %>% 
+  filter(!is.na(age)) %>% 
+  ungroup()
+
+langtot <- response_lang_at_home %>% 
+  mutate(lang = "Total") %>% 
+  group_by(age, lang) %>% 
+  summarise(n = sum(n)) %>% 
+  ungroup()
+
+response_lang_at_home <- response_lang_at_home %>% 
+  bind_rows(langtot) %>% 
+  group_by(age) %>% 
+  calc_shares(group = lang, denom = "Total", value = n)
 ```
 
 ```{r}
 response_lang_at_home %>% 
-  filter(!is.na(share)) %>% 
-  ggplot(aes(x = lang, y = share, group = survey)) +
-  geom_col(position = position_dodge()) +
-  geom_text(data = . %>% filter(share >.1), aes(label = scales::percent(share, accuracy = 1)), vjust = 1.1, size =4) +
-  geom_text(data = . %>% filter(share <=.1), aes(label = scales::percent(share, accuracy = 1)), vjust = -.1, color = "black", size =4) +
-  facet_grid(rows = vars(survey), switch = "y") +
-  labs(title = "Respondents by language spoken at home", x = NULL, y = NULL) +
-  theme(axis.text.y.left = element_blank())
+   mutate(age = fct_rev(age),
+         lang = fct_rev(lang)) %>% 
+  ggplot(aes(x = share, y = age, group = lang)) +
+  geom_col(aes(fill = lang), width = .8, position = position_stack(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  guides(fill = guide_legend(title = "Language", reverse = T)) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  scale_fill_manual(values = unname(qual_pal[c("red", "cyan", "violet", "yellow")])) +
+  labs(x = NULL, y = NULL, title = "Respondents by age and language spoken at home")
 ```
 
-### Internet-enabled devices and internet at home
+### Internet-enabled devices and internet at home x age
 
 ```{r}
-response_web_at_home <- tibble(internet = read_english$Q27,
+response_web_at_home <- tibble(id = read_english$id,
+                               internet = read_english$Q27,
                            survey = as.factor("English")) %>% 
-  bind_rows(tibble(internet = read_spanish$Q27,
+  bind_rows(tibble(id = read_spanish$id,
+                   internet = read_spanish$Q27,
                    survey = as.factor("Spanish"))) %>% 
   filter(!internet %in% c("Prefiero no decir", "Prefer not to say")) %>% 
   mutate(internet = fct_collapse(internet, Yes = c("Yes", "Sí"))) %>% 
   filter(!is.na(internet)) %>% 
-  tabyl(internet, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = internet, denom = "Total", value = value)
+  left_join(age, by = c("survey", "id")) %>% 
+  select(-survey, -id) %>% 
+  group_by(age, internet) %>% 
+  count() %>% 
+  filter(!is.na(age)) %>% 
+  ungroup()
+
+inttot <- response_web_at_home %>% 
+  mutate(internet = "Total") %>% 
+  group_by(age, internet) %>% 
+  summarise(n = sum(n)) %>% 
+  ungroup()
+
+response_web_at_home <- response_web_at_home %>% 
+  bind_rows(inttot) %>% 
+  group_by(age) %>% 
+  calc_shares(group = internet, denom = "Total", value = n)
 ```
 
 ```{r}
 response_web_at_home %>%
-  filter(!is.na(share)) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>%
-  select(-value) %>% 
-  pivot_wider(id_cols = internet, names_from = survey, values_from = share) %>% 
-  knitr::kable()
+  filter(internet == "No") %>% 
+  ggplot(aes(x = age, y = share)) +
+  geom_col(width = .5) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
+  labs(x = NULL, y = NULL, title = "Respondents without internet at home, by age") +
+  theme(axis.text.y = element_blank())
 ```
 
 ```{r}
-response_device_age <- tibble(device = read_english$Q26,
-                          age = as.factor(read_english$Q22),
-                          survey = as.factor("English")) %>% 
-  bind_rows(tibble(device = read_spanish$Q26,
-                   age = as.factor(read_spanish$Q22),
+response_device <- tibble(id = read_english$id,
+                              device = read_english$Q26,
+                              survey = as.factor("English")) %>% 
+  bind_rows(tibble(id = read_spanish$id,
+                   device = read_spanish$Q26,
                    survey = as.factor("Spanish"))) %>% 
   filter(!is.na(device), device != "Prefer not to say") %>% 
   mutate(device = as.factor(device),
          device = fct_collapse(device, Yes = c("Yes", "Sí"))) %>% 
-  filter(!is.na(age)) %>% 
-  mutate(age = if_else(age == "70 o mayor", "70 or older", as.character(age)),
-         age = if_else(age == "Menor de 18", "Under 18", age)) %>% 
-  filter(!age %in% c("Prefiero no decir", "Prefer not to say")) %>% 
-  mutate(age = as.factor(age),
-         age = fct_relevel(age, "Under 18", after = 0L)) %>% 
-  mutate(age = fct_collapse(age, under_40 = c("Under 18", "18-29", "30-39"), over_40 = c("40-49", "50-59", "60-69", "70 or older"))) %>% 
-  group_by(device, age, survey) %>% 
+  left_join(age, by = c("survey", "id")) %>% 
+  select(-survey, -id) %>% 
+  group_by(age, device) %>% 
   count() %>% 
-  ungroup() %>%
-  group_by(survey, age) %>% 
-  mutate(total = sum(n)) %>% 
-  ungroup() %>% 
-  rowwise() %>% 
-  mutate(share = n / total)
+  filter(!is.na(age)) %>% 
+  ungroup()
+
+devtot <- response_device %>% 
+  mutate(device = "Total") %>% 
+  group_by(age, device) %>% 
+  summarise(n = sum(n)) %>% 
+  ungroup()
+
+response_device <- response_device %>% 
+  bind_rows(devtot) %>% 
+  group_by(age) %>% 
+  calc_shares(group = device, denom = "Total", value = n)
 ```
 
 
 ```{r}
-response_device_age %>%
+response_device %>%
   filter(device == "No") %>% 
   ggplot(aes(x = age, y = share)) +
-  geom_col() +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2, size = 4) +
-  facet_grid(cols = vars(survey)) +
-  labs(title = "No internet-enabled device, by age group and survey", y = NULL) +
+  geom_col(width = .5) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
+  labs(x = NULL, y = NULL, title = "Respondents without internet-enabled devices, by age") +
   theme(axis.text.y = element_blank())
 ```
 
 ### Registered voter
 
 ```{r}
-response_voter <- tibble(registered = as.factor(read_english$Q28),
+response_voter <- tibble(id = read_english$id,
+                         registered = as.factor(read_english$Q28),
        survey = as.factor("English")) %>% 
-  bind_rows(tibble(registered = as.factor(read_spanish$Q28),
+  bind_rows(tibble(id = read_spanish$id,
+                   registered = as.factor(read_spanish$Q28),
                    survey = as.factor("Spanish"))) %>% 
    filter(!is.na(registered)) %>% 
   mutate(registered = fct_collapse(registered, Yes = c("Yes", "Sí"), `Not sure/Prefer not to say` = c("Prefer not to say", "Prefiero no decir", "Not sure", "No estoy seguro/a"))) %>% 
-  tabyl(registered, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = registered, denom = "Total", value = value)
+  left_join(age, by = c("survey", "id")) %>% 
+  select(-survey, -id) %>% 
+  group_by(age, registered) %>% 
+  count() %>% 
+  filter(!is.na(age)) %>% 
+  ungroup()
+
+votetot <- response_voter %>% 
+  mutate(registered = "Total") %>% 
+  group_by(age, registered) %>% 
+  summarise(n = sum(n)) %>% 
+  ungroup()
+
+response_voter <- response_voter %>% 
+  bind_rows(votetot) %>% 
+  group_by(age) %>% 
+  calc_shares(group = registered, denom = "Total", value = n)
 ```
 
 ```{r}
 response_voter %>% 
-  filter(!is.na(share)) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>% 
-  pivot_wider(id_cols = registered, names_from = survey, values_from = share) %>% 
-  knitr::kable()
+  filter(registered == "Yes") %>% 
+  mutate(age = fct_rev(age)) %>% 
+  ggplot(aes(x = share, y = age)) +
+  geom_col() +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
+  labs(x = NULL, y = NULL, title = "Registered voters, by age") +
+  theme(axis.text.x = element_blank())
 ```
 
-### Other demographic details
+## Other demographic details
 
 ```{r}
-response_details <- tibble(indicator = read_english$Q25,
+response_details <- tibble(id = read_english$id,
+                           indicator = read_english$Q25,
                            survey = as.factor("English")) %>% 
-  bind_rows(tibble(indicator = read_spanish$Q25,
+  bind_rows(tibble(id = read_spanish$id,
+                   indicator = read_spanish$Q25,
                    survey = as.factor("Spanish"))) %>% 
   filter(!is.na(indicator)) %>% 
   mutate(indicator = if_else(grepl("stu", indicator), "Student", indicator),
@@ -415,23 +483,47 @@ response_details <- tibble(indicator = read_english$Q25,
          indicator = if_else(grepl("None|Ninguno", indicator), "None of these", indicator)) %>% 
   mutate(indicator = as.factor(indicator),
          indicator = fct_relevel(indicator, "None of these", after = Inf)) %>% 
-  tabyl(indicator, survey) %>% 
-  adorn_totals("row") %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = indicator, denom = "Total", value = value)
+  left_join(age, by = c("survey", "id")) %>% 
+  select(-survey, -id) %>% 
+  group_by(age, indicator) %>% 
+  count() %>% 
+  filter(!is.na(age)) %>% 
+  ungroup()
+
+typetot <- response_details %>% 
+  mutate(indicator = "Total") %>% 
+  group_by(age, indicator) %>% 
+  summarise(n = sum(n)) %>% 
+  ungroup()
+
+response_details <- response_details %>% 
+  bind_rows(typetot) %>% 
+  group_by(age) %>% 
+  calc_shares(group = indicator, denom = "Total", value = n)
 ```
+
+76 business owners out of 1648 responses is pretty low (<5% of respondents), 11% are students, 40% are parents. I'll only break this down by age.
 
 ```{r}
 response_details %>% 
-  filter(!indicator %in% c("Total", "None of these")) %>% 
-  ggplot(aes(x = share, y = fct_rev(indicator))) +
-  geom_col() +
-  geom_text(data = . %>% filter(share >.08), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1, size =4) +
-  geom_text(data = . %>% filter(share <=.08), aes(label = scales::percent(share, accuracy = 1)), hjust = -.1, color = "black", size =4) +
-  facet_grid(cols = vars(survey)) +
-  labs(title = "Respondents by demographic detail", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
+  filter(indicator != "Total") %>% 
+  select(-age) %>% 
+  group_by(indicator) %>% 
+  summarise(n = sum(n))
+```
+Half of the respondents under 30 are students, more than 2/3s of the respondents 30-49 are parents, and just slightly more of the respondents over 50 are business owners.
+
+```{r}
+response_details %>%
+  mutate(age = fct_rev(age)) %>% 
+  mutate(indicator = fct_rev(indicator)) %>% 
+  ggplot(aes(x = share, y = age, group = indicator)) +
+  geom_col(aes(fill = indicator), position = position_stack(.9), width = .5) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  scale_fill_manual(values = unname(qual_pal[c("gray", "cyan", "violet", "yellow")])) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  labs(title = "Select personal characteristics by age", x = NULL, y = NULL)
 ```
 
 
