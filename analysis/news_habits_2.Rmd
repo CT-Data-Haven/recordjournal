@@ -73,3 +73,197 @@ bind <- bind_rows(read_english, read_spanish) %>%
   left_join(latino, by = "Q20") %>% 
   left_join(gender, by = "Q23")
 ```
+
+## Geographic scope
+
+```{r}
+#Denoms are hard-coded so we get share of respondents, not share of responses
+
+eng_geo <- tibble(geo = c(str_split(read_english$Q2, ";", simplify = T)),
+                  survey = "English")
+spn_geo <- tibble(geo = c(str_split(read_spanish$Q2, ";", simplify = T)),
+                  survey = "Spanish")
+
+response_geos <- bind_rows(eng_geo, spn_geo) %>% 
+  filter(!geo %in% c("", "No", "None", "Yo'u're too biased.  way too liberal.", "PUERTO RICO")) %>% 
+  mutate(geo = if_else(geo == "Estatal", "State", geo),
+         geo = if_else(geo == "Nacional", "National", geo),
+         geo = if_else(grepl("Inter", geo), "International", geo),
+         geo = if_else(grepl("Regional", geo), "Regional", geo)) %>% 
+  mutate(geo = str_to_title(geo)) %>% 
+  filter(!is.na(geo)) %>% 
+  tabyl(geo, survey) %>% 
+  add_row(geo = "Total", English = 482, Spanish  = 630) %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = geo, denom = "Total", value = value)
+```
+
+Local news generally more popular than farther-out regions. Also note that one person wrote in Puerto Rico for the geographical question.
+
+```{r echo = F}
+response_geos %>%
+  filter(!is.na(share)) %>% 
+  filter(geo %in% c("Local", "State", "Regional", "National", "International")) %>% 
+  mutate(geo = as.factor(geo),
+         geo = fct_relevel(geo, "Local", "State", "Regional", "National", "International")) %>% 
+  ggplot(aes(x = geo, y = share)) +
+  geom_col(width = .8) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
+  facet_grid(rows = vars(survey), switch = "y") +
+  theme(axis.text.y = element_blank()) +
+  labs(x = NULL, y = NULL, title = "Respondents by geographical interest")
+```
+
+## Topics
+
+```{r}
+#Also hard coded denoms.
+
+eng_topics_under40 <- read_english %>% 
+  select(id, Q3) %>% 
+  left_join(age, by = "id") %>% 
+  filter(age == "under_40") %>% 
+  select(Q3)
+
+eng_topics_over40 <- read_english %>% 
+  select(id, Q3) %>% 
+  left_join(age, by = "id") %>% 
+  filter(age == "over_40") %>% 
+  select(Q3)
+
+spn_topics_under40 <- read_spanish %>% 
+  select(id, Q3) %>% 
+  left_join(age, by = "id") %>% 
+  filter(age == "under_40") %>% 
+  select(Q3)
+
+spn_topics_over40 <- read_spanish %>% 
+  select(id, Q3) %>% 
+  left_join(age, by = "id") %>% 
+  filter(age == "over_40") %>% 
+  select(Q3)
+
+eng_topic_list1 <- tibble(topic = c(str_split(eng_topics_under40$Q3, ";(?=[A-Z])", simplify = T)),
+                          age = "under_40",
+                          survey = "English")
+eng_topic_list2 <- tibble(topic = c(str_split(eng_topics_over40$Q3, ";(?=[A-Z])", simplify = T)),
+                          age = "over_40",
+                          survey = "English")
+spn_topic_list1 <- tibble(topic = c(str_split(spn_topics_under40$Q3, ";(?=[A-Z])", simplify = T)),
+                          age = "under_40",
+                          survey = "Spanish")
+spn_topic_list2 <- tibble(topic = c(str_split(spn_topics_over40$Q3, ";(?=[A-Z])", simplify = T)),
+                          age = "over_40",
+                          survey = "Spanish")
+
+denoms <- tibble(survey = c(rep("English", 2), rep("Spanish", 2)),
+                 age = c("under_40", "over_40", "under_40", "over_40"),
+                 total = c(182, 284, 222, 399))
+
+response_topic <- bind_rows(eng_topic_list1, eng_topic_list2, spn_topic_list1, spn_topic_list2) %>%
+  filter(!is.na(age)) %>% 
+  filter(topic != "") %>% 
+  filter(!topic == "None") %>% 
+  filter(!grepl("ratings", topic)) %>% #medical facilities = health
+  add_row(topic = "Health", survey = "English") %>% 
+  mutate(topic = if_else(grepl("arte", topic), "Music, arts, and culture", topic),
+         topic = if_else(grepl("Educ", topic), "Education", topic),
+         topic = if_else(grepl("Negocios", topic), "Local businesses", topic),
+         topic = if_else(grepl("Eventos", topic), "Local events", topic),
+         topic = if_else(grepl("Políticas", topic), "Politics", topic),
+         topic = if_else(grepl("Salud", topic), "Health", topic),
+         topic = if_else(grepl("Deportes", topic), "Sports", topic),
+         topic = if_else(grepl("resources|Recursos", topic), "Community resources", topic),
+         topic = if_else(grepl("Diversidad", topic), "Diversity and social justice", topic),
+         topic = if_else(grepl("Tecno", topic), "Technology", topic),
+         topic = if_else(grepl("Finanzas", topic), "Finance, wealth, and financial literacy", topic),
+         topic = if_else(grepl("Oport", topic), "Opportunities for community engagement", topic),
+         topic = if_else(grepl("Viajes", topic), "Travel and hospitality", topic),
+         topic = if_else(grepl("cambio", topic), "Environmental issues & climate change", topic),
+         topic = if_else(grepl("vivienda", topic), "Real estate and homeownership", topic),
+         topic = if_else(topic == "Comida", "Food", topic)) %>% 
+  mutate(topic = str_replace(topic, "&", "and"),
+         topic = str_replace(topic, "Environmental", "Env."),
+         topic = str_replace(topic, "Opportunities", "Opps."),
+         topic = str_replace(topic, "Community", "Comm."),
+         topic = str_replace(topic, "community", "comm.")) %>% 
+  group_by(survey, age, topic) %>% 
+  count() %>% 
+  ungroup() %>% 
+  left_join(denoms, by = c("survey", "age")) %>% 
+  rowwise() %>% 
+  mutate(share = n / total) %>% 
+  ungroup()
+```
+
+Over and under 40 for the English language survey have the same top 5 or so topics of interest with Education, Music/Arts/Culture, and Health topping the lists.
+
+```{r fig.height=6}
+response_topic %>% 
+  filter(survey == "English", n >= 10) %>% 
+  ggplot(aes(x = share, y = reorder(topic, share))) +
+  geom_col() +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
+  facet_grid(cols = vars(age)) +
+  labs(title = "Topics of interest by age, English survey respondents", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank())
+```
+
+Health and Education top the list for Spanish survey respondents in both age groups. For younger people, the next three are Sports, Politics, and Music/Arts/Culture. For older people it's Sports, Music/Arts/Culture, and Local Events.
+
+```{r fig.height=6}
+response_topic %>% 
+  filter(survey == "Spanish", n >= 10) %>% 
+  ggplot(aes(x = share, y = reorder(topic, share))) +
+  geom_col() +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
+  facet_grid(cols = vars(age)) +
+  labs(title = "Topics of interest by age, Spanish survey respondents", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank())
+```
+
+## Special topics
+
+```{r}
+eng_special_topic <- tibble(topic = c(str_split(read_english$Q4, ";(?=[A-Z])", simplify = T)),
+                    survey = "English") %>% 
+  mutate(topic = str_remove(topic, "Topics related to "))
+spn_special_topic <- tibble(topic = c(str_split(read_spanish$Q4, ";(?=[A-Z])", simplify = T)),
+                    survey = "Spanish") %>% 
+  mutate(topic = str_remove(topic, "Temas acerca de "))
+
+response_special_topic <- bind_rows(eng_special_topic, spn_special_topic) %>%
+  filter(topic != "") %>% 
+  mutate(topic = str_to_sentence(topic)) %>% 
+  mutate(topic = if_else(grepl("Familias", topic), "Families with children", topic),
+         topic = if_else(grepl("Propietarios", topic), "Small business owners", topic),
+         topic = if_else(grepl("edad", topic), "Seniors", topic),
+         topic = if_else(grepl("Los", topic), "Teens", topic),
+         topic = if_else(grepl("Jóvenes|adolescentes", topic), "Young adults", topic),
+         topic = if_else(grepl("Participacion", topic), "Community engagement", topic)) %>%
+  filter(!topic %in% c("None of these", "No", "Ninguno de estos")) %>% 
+  filter(!grepl("subscribe", topic)) %>% 
+  tabyl(topic, survey) %>% 
+  add_row(topic = "Total", English = 482, Spanish  = 630) %>% 
+  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
+  group_by(survey) %>% 
+  calc_shares(group = topic, denom = "Total", value = value)
+```
+
+Special topic areas being primarily focused on families makes sense with who we're surveying and how we're collecting responses.
+
+```{r}
+response_special_topic %>% 
+  filter(value > 1) %>% 
+  filter(!is.na(share)) %>% 
+  mutate(topic = as.factor(topic),
+         topic = fct_rev(topic)) %>% 
+  ggplot(aes(x = share, y = reorder(topic, share))) +
+  geom_col(width = .8) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
+  facet_grid(cols = vars(survey)) +
+  theme(axis.text.x = element_blank()) +
+  labs(y = "Topics relevant to...", x = NULL, title = "Share of respondents by special topic area")
+```
+
