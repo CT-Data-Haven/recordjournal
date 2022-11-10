@@ -1,0 +1,75 @@
+---
+title: "News habits 2"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+library(tidyverse)
+library(cwi)
+library(janitor)
+library(camiller)
+source("../utils/plot_utils.R")
+source("look_up_tibbles.R")
+
+```
+
+```{r}
+path <- "../survey_data/11082022/"
+plot_path <- "../distro/"
+```
+
+```{r}
+read_english <- read_csv(paste(path, "(English) RJ Latino Communities Reporting Lab Survey.csv", sep = "")) %>% 
+  clean_names()
+
+read_spanish <- read_csv(paste(path, "(Spanish) RJ Latino Communities Reporting Lab Survey.csv", sep = "")) %>% 
+  clean_names()
+
+qhead_eng <- tibble(question = paste("Q", 1:32, sep = ""),
+                    label = colnames(read_english))
+qhead_spn <- tibble(question = paste("Q", 1:32, sep = ""),
+                    label = colnames(read_spanish))
+
+colnames(read_english) <- qhead_eng$question
+colnames(read_spanish) <- qhead_eng$question
+
+read_english <- read_english %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
+read_spanish <- read_spanish %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
+```
+
+```{r}
+read_english_pr <- read_csv("../survey_data/08302022/(English - PR) RJ Latino Communities Reporting Lab Survey 2 2.csv") %>% 
+  clean_names() %>% 
+  mutate(`are_you_interested_in_news_at_the_following_geographical_levels_select_all_that_apply` = NA,
+         `which_of_these_topics_interest_you_most_select_up_to_five` = NA,
+         `do_any_of_these_special_stories_interest_you_select_all_that_apply` = NA,
+         `are_there_any_specific_stories_you_would_like_to_see_more_of_in_local_news_for_example_investigative_articles_business_profiles_opinion_columns_cartoons_etc` = NA) %>% 
+  select(timestamp, `are_you_interested_in_news_at_the_following_geographical_levels_select_all_that_apply`, `which_of_these_topics_interest_you_most_select_up_to_five`, `do_any_of_these_special_stories_interest_you_select_all_that_apply`, `are_there_any_specific_stories_you_would_like_to_see_more_of_in_local_news_for_example_investigative_articles_business_profiles_opinion_columns_cartoons_etc`, everything())
+
+read_spanish_pr <- read_csv("../survey_data/08302022/(Spanish - PR) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses.csv") %>% 
+  clean_names()
+
+qhead_eng_pr <- tibble(question = paste("Q", 1:29, sep = ""),
+                    label = colnames(read_english_pr))
+qhead_spn_pr <- tibble(question = paste("Q", 1:29, sep = ""),
+                    label = colnames(read_spanish_pr))
+
+colnames(read_english_pr) <- qhead_spn_pr$question
+colnames(read_spanish_pr) <- qhead_spn_pr$question
+
+read_english_pr <- read_english_pr %>% remove_empty("rows")
+read_spanish_pr <- read_spanish_pr %>% remove_empty("rows")
+
+read_english <- read_english %>% bind_rows(read_english_pr) %>% rename(id = Q1)
+read_spanish <- read_spanish %>% bind_rows(read_spanish_pr) %>% rename(id = Q1)
+
+bind <- bind_rows(read_english, read_spanish) %>% 
+  left_join(age, by = "Q22") %>% 
+  left_join(language, by = "Q24") %>% 
+  left_join(latino, by = "Q20") %>% 
+  left_join(gender, by = "Q23")
+```

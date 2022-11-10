@@ -13,12 +13,13 @@ library(cwi)
 library(janitor)
 library(camiller)
 source("../utils/plot_utils.R")
+source("look_up_tibbles.R")
 
 #Cannot just re-run this! some denoms are hard-coded for non-response, and there's some text mining
 ```
 
 ```{r}
-path <- "../survey_data/09142022/"
+path <- "../survey_data/11082022/"
 plot_path <- "../distro/"
 ```
 
@@ -40,10 +41,6 @@ colnames(read_spanish) <- qhead_eng$question
 read_english <- read_english %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
 read_spanish <- read_spanish %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
 ```
-
-Add PR festival data, hard code paths since it won't change, bind to primary surveys.
-
-Just realized I deleted an entire section from the English PR Festival survey... I'll summarize what we have for the Spanish respondents, but the questions were those about what content they'd like to see.
 
 ```{r}
 read_english_pr <- read_csv("../survey_data/08302022/(English - PR) RJ Latino Communities Reporting Lab Survey 2 2.csv") %>% 
@@ -70,37 +67,23 @@ read_spanish_pr <- read_spanish_pr %>% remove_empty("rows")
 
 read_english <- read_english %>% bind_rows(read_english_pr) %>% rename(id = Q1)
 read_spanish <- read_spanish %>% bind_rows(read_spanish_pr) %>% rename(id = Q1)
-```
 
-```{r}
-age <- tibble(id = read_english$id,
-              age = as.factor(read_english$Q22),
-              survey = as.factor("English")) %>% 
-  bind_rows(tibble(id = read_spanish$id,
-                   age = as.factor(read_spanish$Q22),
-                   survey = as.factor("Spanish"))) %>% 
-  filter(!is.na(age)) %>% 
-  mutate(age = if_else(age == "70 o mayor", "70 or older", as.character(age)),
-         age = if_else(age == "Menor de 18", "Under 18", age)) %>% 
-  filter(!age %in% c("Prefiero no decir", "Prefer not to say")) %>% 
-  mutate(age = as.factor(age),
-         age = fct_relevel(age, "Under 18", after = 0L)) %>% 
-  mutate(age = fct_collapse(age, under_40 = c("Under 18", "18-29", "30-39"), over_40 = c("40-49", "50-59", "60-69", "70 or older")))
+bind <- bind_rows(read_english, read_spanish) %>% 
+  left_join(age, by = "Q22") %>% 
+  left_join(language, by = "Q24") %>% 
+  left_join(latino, by = "Q20") %>% 
+  left_join(gender, by = "Q23")
 ```
 
 ## Media used vs. Media preferred
 
-I broke these into two charts by survey language and age so we can compare what medium they prefer to which they use more easily.
+By age and language at home
 
 ```{r}
-response_mode <- tibble(id = read_english$id,
-                        use_mode = as.factor(read_english$Q9),
-                        pref_mode = as.factor(read_english$Q11),
-                        survey = as.factor("English")) %>% 
-  bind_rows(tibble(id = read_spanish$id,
-                   use_mode = as.factor(read_spanish$Q9),
-                   pref_mode = as.factor(read_spanish$Q11),
-                   survey = as.factor("Spanish"))) %>% 
+response_mode <- tibble(age = bind$age,
+                        language = bind$language,
+                        use_mode = as.factor(bind$Q9),
+                        pref_mode = as.factor(bind$Q11)) %>% 
   filter(!is.na(pref_mode) & !is.na(use_mode)) %>% 
   mutate(clean_use = if_else(grepl("app|online|noticias", use_mode), "News apps", as.character(use_mode)),
          clean_use = if_else(use_mode %in% c("Medios sociales"), "Social media", clean_use),
@@ -115,28 +98,53 @@ response_mode <- tibble(id = read_english$id,
          clean_pref = if_else(grepl("Periódicos", clean_pref), "Newspapers", clean_pref),
          clean_pref = if_else(clean_pref == "Textos", "Text message", clean_pref),
          clean_pref = if_else(clean_pref == "Celular", "Text message", clean_pref)) %>% 
-  left_join(age, by = c("survey", "id")) %>% 
-  select(survey, clean_use, clean_pref, age)
+  select(clean_use, clean_pref, age, language)
 
-mode_to_plot <- response_mode %>%
-  select(survey, mode = clean_use, age) %>%
+mode_to_plot_age <- response_mode %>%
+  select(age, mode = clean_use) %>%
   filter(!is.na(age)) %>% 
-  group_by(mode, age, survey) %>% 
+  group_by(mode, age) %>% 
   count() %>% 
   ungroup() %>%
-  group_by(survey, age) %>% 
+  group_by(age) %>% 
   mutate(total = sum(n)) %>% 
   ungroup() %>% 
   rowwise() %>% 
   mutate(share = n / total,
          type = "Use") %>% 
   bind_rows(response_mode %>%
-              select(survey, mode = clean_pref, age) %>%
+              select(mode = clean_pref, age) %>%
               filter(!is.na(age)) %>% 
-              group_by(mode, age, survey) %>% 
+              group_by(mode, age) %>% 
               count() %>% 
               ungroup() %>%
-              group_by(survey, age) %>% 
+              group_by(age) %>% 
+              mutate(total = sum(n)) %>% 
+              ungroup() %>% 
+              rowwise() %>% 
+              mutate(share = n / total,
+                     type = "Prefer")) %>% 
+  ungroup()
+
+mode_to_plot_lang <- response_mode %>%
+  select(language, mode = clean_use) %>%
+  filter(!is.na(language)) %>% 
+  group_by(mode, language) %>% 
+  count() %>% 
+  ungroup() %>%
+  group_by(language) %>% 
+  mutate(total = sum(n)) %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(share = n / total,
+         type = "Use") %>% 
+  bind_rows(response_mode %>%
+              select(mode = clean_pref, language) %>%
+              filter(!is.na(language)) %>% 
+              group_by(mode, language) %>% 
+              count() %>% 
+              ungroup() %>%
+              group_by(language) %>% 
               mutate(total = sum(n)) %>% 
               ungroup() %>% 
               rowwise() %>% 
@@ -145,73 +153,47 @@ mode_to_plot <- response_mode %>%
   ungroup()
 ```
 
-For English language respondents under 40, social media is by far the most popular way people use to get news and prefer to get news. The over-40 crowd prefers TV. There's a bigger preference than use for news apps (I wonder if people know they exist) and newspapers (cost? access?). Again, newsletters might be something to promote.
+I expected to see variation by age.
 
 ```{r}
-# add_rows <- tibble(mode = c(rep("Social circles", 2), rep("Internet", 3)),
-#                    age = c("under_40", "over_40", "under_40", "over_40", "over_40"),
-#                    survey = c(rep("English", 5)),
-#                    n = c(rep(0, 5)),
-#                    total = c(76, 110, 76, 110, 110),
-#                    share = c(rep(0, 5)),
-#                    type = c(rep("Prefer", 4), "Use")) %>% 
-#   mutate(age = as.factor(age),
-#          survey = as.factor(survey))
-
-mode_to_plot %>% 
-  filter(survey == "English", ,
-         n >= 5) %>% 
-  #bind_rows(add_rows) %>% 
+mode_to_plot_age %>% 
+  filter(age != "Opt out") %>% 
+ filter(mode %in% c("TV", "Social media", "News apps", "Newspapers", "Email/newsletters")) %>% 
   ggplot(aes(x = share, y = reorder(mode, share), group = type)) +
   geom_col(aes(fill = type), position = position_dodge(.9)) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = 1, color = "black") +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = "end", color = "black") +
   facet_grid(cols = vars(age), space = "free") +
   theme(legend.position = "bottom",
         axis.text.x = element_blank()) +
       scale_fill_manual(values = unname(qual_pal[c("violet", "cyan")])) +
-  labs(title = "News source preferences/use by age, English language respondents",
+  labs(title = "News source preferences/use by age", subtitle = "Top 5 modes shown",
        x = NULL, y = NULL)
 ```
 
-I'm a bit surprised to see TV and social media pretty comparable for Spanish language respondents under 40. Fully half of respondents over 40 prefer TV (accessible? covering more topics they're interested in?). While not as popular as social media, again, news apps and newsletters might be something to promote.
+I didn't expect these to be so similar
 
 ```{r}
-# add_rows2 <- tibble(mode = c(rep("Social circles", 1), rep("Internet", 3)),
-#                    age = c("over_40", "under_40", "under_40", "over_40"),
-#                    survey = c(rep("Spanish", 4)),
-#                    n = c(rep(0, 4)),
-#                    total = c(157, 93, 93, 157),
-#                    share = c(rep(0, 4)),
-#                    type = c("Prefer", "Use", "Prefer", "Use")) %>% 
-#   mutate(age = as.factor(age),
-#          survey = as.factor(survey))
-
-mode_to_plot %>% 
-  filter(survey == "Spanish",
-         n >= 5) %>% 
-  #bind_rows(add_rows2) %>% 
+mode_to_plot_lang %>% 
+  filter(language != "Opt out") %>% 
+  filter(mode %in% c("TV", "Social media", "News apps", "Newspapers", "Email/newsletters")) %>% 
   ggplot(aes(x = share, y = reorder(mode, share), group = type)) +
   geom_col(aes(fill = type), position = position_dodge(.9)) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = 1, color = "black") +
-  facet_grid(cols = vars(age), space = "free") +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = "end", color = "black") +
+  facet_grid(cols = vars(language), space = "free") +
   theme(legend.position = "bottom",
         axis.text.x = element_blank()) +
-    scale_fill_manual(values = unname(qual_pal[c("violet", "cyan")])) +
-  labs(title = "News source preferences/use by age, Spanish language respondents",
+  scale_fill_manual(values = unname(qual_pal[c("violet", "cyan")])) +
+  labs(title = "News source preferences/use by language spoken at home", subtitle = "Top 5 modes shown",
        x = NULL, y = NULL)
 ```
 
-## Preferred language
+## Preferred language by age and ethnicity
 
 ```{r}
-pref_lang <- tibble(tv_video = read_english$Q6,
-                    radio_audio = read_english$Q7,
-                    print = read_english$Q8,
-                    survey = as.factor("English")) %>% 
-  bind_rows(tibble(tv_video = read_spanish$Q6,
-                   radio_audio = read_spanish$Q7,
-                   print = read_spanish$Q8,
-                   survey = as.factor("Spanish"))) %>% 
+pref_lang_age <- tibble(tv_video = bind$Q6,
+                    radio_audio = bind$Q7,
+                    print = bind$Q8,
+                    age = bind$age) %>% 
   mutate(tv_video = if_else(grepl("Inglés", tv_video), "English", tv_video),
          tv_video = if_else(grepl("Español", tv_video), "Spanish", tv_video),
          tv_video = if_else(grepl("Ambos", tv_video), "Both English and Spanish", tv_video),
@@ -224,71 +206,170 @@ pref_lang <- tibble(tv_video = read_english$Q6,
          print = if_else(grepl("Español", print), "Spanish", print),
          print = if_else(grepl("Ambos", print), "Both English and Spanish", print),
          print = if_else(grepl("Otro", print), "Other", print))
-pref_lang_to_plot <- pref_lang %>%
-  select(survey, language = tv_video) %>%
+
+pref_lang_age_to_plot <- pref_lang_age %>%
+  select(age, language = tv_video) %>%
   filter(!is.na(language), !language %in% c("I don't use this format", "No uso este formato")) %>% 
-  tabyl(language, survey) %>% 
+  tabyl(language, age) %>% 
   adorn_totals("row") %>% 
   mutate(type = "TV/Video") %>% 
-  bind_rows(pref_lang %>% 
-              select(survey, language = radio_audio) %>% 
+  bind_rows(pref_lang_age %>% 
+              select(age, language = radio_audio) %>% 
               filter(!is.na(language), !language %in% c("I don't use this format", "No uso este formato")) %>%  
-              tabyl(language, survey) %>% 
+              tabyl(language, age) %>% 
               adorn_totals("row") %>% 
               mutate(type = "Radio/Audio")) %>% 
-  bind_rows(pref_lang %>% 
-              select(survey, language = print) %>% 
+  bind_rows(pref_lang_age %>% 
+              select(age, language = print) %>% 
               filter(!is.na(language), !language %in% c("I don't use this format", "No uso este formato")) %>%  
-              tabyl(language, survey) %>% 
+              tabyl(language, age) %>% 
               adorn_totals("row") %>% 
               mutate(type = "Print")) %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey, type) %>% 
+  select(-`Opt out`, -`NA_`) %>% 
+  pivot_longer(cols = starts_with("age"), names_to = "age", values_to = "value") %>% 
+  group_by(age, type) %>% 
   calc_shares(group = language, denom = "Total", value = value)
 ```
 
-With language, again a strong preference towards the survey language and "both." In future focus groups if we can ask people who prefer both why they do, that would be helpful.
+Younger people really don't seem to like *just* Spanish language content, but have a stronger overall preference for bilingual content.
 
 ```{r}
-pref_lang_to_plot %>% 
+pref_lang_age_to_plot %>% 
   filter(!is.na(share), language != "Other") %>% 
   ggplot(aes(x = language, y = share)) +
   geom_col(aes(fill = language), position = position_dodge(.9), width = .8) +
   geom_text(data = . %>% filter(share > 0.1), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
   geom_text(data = . %>% filter(share <= 0.1), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = -.2, color = "grey20") +
   guides(fill = guide_legend(title = NULL)) +
-  facet_grid(rows = vars(survey), cols = vars(type), scales = "free_y", switch = "y") +
+  facet_grid(rows = vars(type), cols = vars(age), scales = "free_y", switch = "y") +
  scale_fill_manual(values = unname(qual_pal[c("violet", "cyan", "pink", "teal", "indigo")])) +
   theme(legend.position = "bottom",
         axis.text.x = element_blank(),
         axis.text.y = element_blank()) +
-  labs(x = NULL, y = "Survey language", title = "Share of respondents by preferred langauge by mode")
+  labs(x = NULL, y = "Mode", title = "Share of respondents by age, by preferred langauge by mode")
+```
+
+```{r}
+pref_lang_latino <- tibble(tv_video = bind$Q6,
+                    radio_audio = bind$Q7,
+                    print = bind$Q8,
+                    latino = bind$latino) %>% 
+  mutate(tv_video = if_else(grepl("Inglés", tv_video), "English", tv_video),
+         tv_video = if_else(grepl("Español", tv_video), "Spanish", tv_video),
+         tv_video = if_else(grepl("Ambos", tv_video), "Both English and Spanish", tv_video),
+         tv_video = if_else(grepl("Otro", tv_video), "Other", tv_video)) %>% 
+  mutate(radio_audio = if_else(grepl("Inglés", radio_audio), "English", radio_audio),
+         radio_audio = if_else(grepl("Español", radio_audio), "Spanish", radio_audio),
+         radio_audio = if_else(grepl("Ambos", radio_audio), "Both English and Spanish", radio_audio),
+         radio_audio = if_else(grepl("Otro", radio_audio), "Other", radio_audio)) %>% 
+  mutate(print = if_else(grepl("Inglés", print), "English", print),
+         print = if_else(grepl("Español", print), "Spanish", print),
+         print = if_else(grepl("Ambos", print), "Both English and Spanish", print),
+         print = if_else(grepl("Otro", print), "Other", print))
+
+pref_lang_latino_to_plot <- pref_lang_latino %>%
+  select(latino, language = tv_video) %>%
+  filter(!is.na(language), !language %in% c("I don't use this format", "No uso este formato")) %>% 
+  tabyl(language, latino) %>% 
+  adorn_totals("row") %>% 
+  mutate(type = "TV/Video") %>% 
+  bind_rows(pref_lang_latino %>% 
+              select(latino, language = radio_audio) %>% 
+              filter(!is.na(language), !language %in% c("I don't use this format", "No uso este formato")) %>%  
+              tabyl(language, latino) %>% 
+              adorn_totals("row") %>% 
+              mutate(type = "Radio/Audio")) %>% 
+  bind_rows(pref_lang_latino %>% 
+              select(latino, language = print) %>% 
+              filter(!is.na(language), !language %in% c("I don't use this format", "No uso este formato")) %>%  
+              tabyl(language, latino) %>% 
+              adorn_totals("row") %>% 
+              mutate(type = "Print")) %>% 
+  select(-`Opt out`, -`NA_`) %>% 
+  pivot_longer(cols = c("No", "Yes"), names_to = "latino", values_to = "value") %>% 
+  group_by(latino, type) %>% 
+  calc_shares(group = language, denom = "Total", value = value)
+```
+
+Generally speaking, respondents who identify as Latino don't prefer English language only content.
+
+```{r}
+pref_lang_latino_to_plot %>% 
+  filter(!is.na(share), language != "Other", latino == "Yes") %>% 
+  ggplot(aes(x = language, y = share)) +
+  geom_col(aes(fill = language), position = position_dodge(.9), width = .8) +
+  geom_text(data = . %>% filter(share > 0.1), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
+  geom_text(data = . %>% filter(share <= 0.1), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = -.2, color = "grey20") +
+  guides(fill = guide_legend(title = NULL)) +
+  facet_grid(rows = vars(type), scales = "free_y", switch = "y") +
+ scale_fill_manual(values = unname(qual_pal[c("violet", "cyan", "pink", "teal", "indigo")])) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+  labs(x = NULL, y = "Mode", title = "Share of respondents who identify as Latino, by preferred langauge by mode")
 ```
 
 ## News sources
 
-Preferred sources is also an open text field. Mining for a word cloud...
+Preferred sources is also an open text field. Mining for word clouds...
 
 ```{r}
-eng_under40 <- read_english %>% left_join(age, by = "id") %>% filter(age == "under_40")
-spn_under40 <- read_spanish %>% left_join(age, by = "id") %>% filter(age == "under_40")
-eng_over40 <- read_english %>% left_join(age, by = "id") %>% filter(age == "over_40")
-spn_over40 <- read_spanish %>% left_join(age, by = "id") %>% filter(age == "over_40")
+age00_29 <- bind %>% filter(age == "age00_29")
+age30_49 <- bind %>% filter(age == "age30_49")
+age50_99 <- bind %>% filter(age == "age50_99")
+
+latino <- bind %>% filter(latino == "Yes")
+
+spn_at_home <- bind %>% filter(language == "Spanish")
+eng_at_home <- bind %>% filter(language == "English")
+both_at_home <- bind %>% filter(language == "Both English and Spanish")
+
+list_age00_29 <- str_split(age00_29$Q10, ",| y | and | or|\\/|  ", simplify = T)
+list_age30_49 <- str_split(age30_49$Q10, ",| y | and | or|\\/|  ", simplify = T)
+list_age50_99 <- str_split(age50_99$Q10, ",| y | and | or|\\/|  ", simplify = T)
+
+list_latino <- str_split(latino$Q10, ",| y | and | or|\\/|  ", simplify = T)
+
+list_spn_at_home <- str_split(spn_at_home$Q10, ",| y | and | or|\\/|  ", simplify = T)
+list_eng_at_home <- str_split(eng_at_home$Q10, ",| y | and | or|\\/|  ", simplify = T)
+list_both_at_home <- str_split(both_at_home$Q10, ",| y | and | or|\\/|  ", simplify = T)
+
+clean_clouds <- function(x){
+ x %>% 
+    filter(!is.na(source), source != "") %>% 
+    mutate(source = str_to_upper(source)) %>%
+    mutate(source = str_trim(source, side = "both")) 
+}
+
+a <- tibble(source = c(list_age00_29)) %>% clean_clouds()
+b <- tibble(source = c(list_age30_49)) %>% clean_clouds()
+c <- tibble(source = c(list_age50_99)) %>% clean_clouds()
+d <- tibble(source = c(list_latino)) %>% clean_clouds()
+e <- tibble(source = c(list_spn_at_home)) %>% clean_clouds()
+f <- tibble(source = c(list_eng_at_home)) %>% clean_clouds()
+g <- tibble(source = c(list_both_at_home)) %>% clean_clouds()
+
+cloud_a <- a %>% group_by(source) %>% count()
+cloud_b <- b %>% group_by(source) %>% count()
+cloud_c <- c %>% group_by(source) %>% count()
+cloud_d <- d %>% group_by(source) %>% count()
+cloud_e <- e %>% group_by(source) %>% count()
+cloud_f <- f %>% group_by(source) %>% count()
+cloud_g <- g %>% group_by(source) %>% count()
 ```
 
-```{r}
-eng_list_under40 <- str_split(eng_under40$Q10, ",| y | and | or|\\/|  ", simplify = T)
+```{r eval = F}
 spn_list_under40 <- str_split(spn_under40$Q10, ",| y | and | or|\\/|  ", simplify = T)
 
-# add_back <- tibble(source = c("FACEBOOK", "GOOGLE", "HARTFORD COURANT", "TELEMUNDO", "WFSB", "TELEFE INTERNATIONAL", "RECORD-JOURNAL", "FACEBOOK", "HARTFORD COURANT", "CT POST", "WTNH", "TELEMUNDO", "CNN", "INSTAGRAM", "INSTAGRAM"))
-                              
+x <- tibble(source = c(list_age00_29)) %>% 
+  filter(!is.na(source), source != "")
+
                               
 x <- tibble(source = c(spn_list_under40, eng_list_under40)) %>% 
   filter(!is.na(source), source != "") %>% 
   mutate(source = str_to_upper(source)) %>%
   mutate(source = str_trim(source, side = "both")) %>% 
   mutate(source = str_remove(source,  c(" IF AVAILABLE| PRINT EDITION"))) %>% 
-  # filter(!source %in% c("N", "A", "FACEBOOK GOOGLE", "HARTFORD COURANT TELEMUNDO WFSB 3 TELEFE INTERNATIONAL", "RECORD JOURNAL FACEBOOK", "HARTFORD COURANT CT POST WTNH", "TODO", "TODOS", "UN POCO DE TODO", "USUALLY TELEMUNDO", "NONE", "CNN E INSTAGRAM", "IG")) %>% #will add these back properly below
   mutate(source = if_else(grepl("RECORD|RJ|R-J", source), "RECORD-JOURNAL", source),
          source = if_else(grepl("NBC|CHANNEL 30", source), "NBC", source),
          source = if_else(grepl("FOX", source), "FOX NEWS", source),
@@ -301,12 +382,10 @@ x <- tibble(source = c(spn_list_under40, eng_list_under40)) %>%
          source = if_else(grepl("UNIV", source), "UNIVISION", source)) %>% 
   mutate(source = str_trim(source, side = "both"))
 
-cloud_under40 <- x %>% group_by(source) %>% count()
+cloud_00_29 <- x %>% group_by(source) %>% count()
 
 eng_list_over40 <- str_split(eng_over40$Q10, ",| y | and | or|\\/|  ", simplify = T)
 spn_list_over40 <- str_split(spn_over40$Q10, ",| y | and | or|\\/|  ", simplify = T)
-
-# add_back <- tibble(source = c("FACEBOOK", "GOOGLE", "HARTFORD COURANT", "TELEMUNDO", "WFSB", "TELEFE INTERNATIONAL", "RECORD-JOURNAL", "FACEBOOK", "HARTFORD COURANT", "CT POST", "WTNH", "TELEMUNDO", "CNN", "INSTAGRAM", "INSTAGRAM"))
                               
                               
 y <- tibble(source = c(spn_list_over40, eng_list_over40)) %>% 
@@ -314,233 +393,83 @@ y <- tibble(source = c(spn_list_over40, eng_list_over40)) %>%
   mutate(source = str_to_upper(source)) %>%
   mutate(source = str_trim(source, side = "both")) %>% 
   mutate(source = str_remove(source,  c(" IF AVAILABLE| PRINT EDITION"))) %>% 
-  # filter(!source %in% c("N", "A", "FACEBOOK GOOGLE", "HARTFORD COURANT TELEMUNDO WFSB 3 TELEFE INTERNATIONAL", "RECORD JOURNAL FACEBOOK", "HARTFORD COURANT CT POST WTNH", "TODO", "TODOS", "UN POCO DE TODO", "USUALLY TELEMUNDO", "NONE", "CNN E INSTAGRAM", "IG")) %>% #will add these back properly below
-  mutate(source = if_else(grepl("RECORD|RJ|R-J", source), "RECORD-JOURNAL", source),
-         source = if_else(grepl("NBC|CHANNEL 30", source), "NBC", source),
-         source = if_else(grepl("FOX", source), "FOX NEWS", source),
-         source = if_else(grepl("CHANNEL 8", source), "WTNH", source),
-         source = if_else(grepl("CHANNEL 3|CHANEL 3|WFSB", source), "WFSB", source),
-         source = if_else(grepl("BREAK", source), "NEWSBREAK", source),
-         source = if_else(grepl("LOCAL", source), "LOCAL STATIONS", source),
-         source = if_else(grepl("HEARALD", source), "NEW BRITAIN HERALD", source),
-         source = if_else(grepl("WAPO", source), "WASHINGTON POST", source),
-         source = if_else(grepl("UNIV", source), "UNIVISION", source)) %>% 
-  mutate(source = str_trim(source, side = "both"))
+  # mutate(source = if_else(grepl("RECORD|RJ|R-J", source), "RECORD-JOURNAL", source),
+  #        source = if_else(grepl("NBC|CHANNEL 30", source), "NBC", source),
+  #        source = if_else(grepl("FOX", source), "FOX NEWS", source),
+  #        source = if_else(grepl("CHANNEL 8", source), "WTNH", source),
+  #        source = if_else(grepl("CHANNEL 3|CHANEL 3|WFSB", source), "WFSB", source),
+  #        source = if_else(grepl("BREAK", source), "NEWSBREAK", source),
+  #        source = if_else(grepl("LOCAL", source), "LOCAL STATIONS", source),
+  #        source = if_else(grepl("HEARALD", source), "NEW BRITAIN HERALD", source),
+  #        source = if_else(grepl("WAPO", source), "WASHINGTON POST", source),
+  #        source = if_else(grepl("UNIV", source), "UNIVISION", source)) %>% 
+  # mutate(source = str_trim(source, side = "both"))
 
 cloud_over40 <- y %>% group_by(source) %>% count()
 
 ```
+
+By age, young people put fewer answers in, older people put a lot more
 
 ```{r}
 library(ggwordcloud)
 
 set.seed(13)
 
-ggplot(cloud_under40, aes(label = source, size = n+3, color = n)) +
+ggplot(cloud_a, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
   scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
-  labs(title = "Sources preferred by people under 40")
+  labs(title = "Sources preferred by people under 30")
 
-ggplot(cloud_over40, aes(label = source, size = n+3, color = n)) +
+ggplot(cloud_b, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
   scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
-  labs(title = "Sources preferred by people over 40")
+  labs(title = "Sources preferred by people 30-49")
+
+ggplot(cloud_c, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by people 50+")
 ```
 
-## Geographic scope
+Telemundo far and away the favored source for Latinos
 
 ```{r}
-#Denoms are hard-coded so we get share of respondents, not share of responses
-
-eng_geo <- tibble(geo = c(str_split(read_english$Q2, ";", simplify = T)),
-                  survey = "English")
-spn_geo <- tibble(geo = c(str_split(read_spanish$Q2, ";", simplify = T)),
-                  survey = "Spanish")
-
-response_geos <- bind_rows(eng_geo, spn_geo) %>% 
-  filter(!geo %in% c("", "No", "None", "Yo'u're too biased.  way too liberal.", "PUERTO RICO")) %>% 
-  mutate(geo = if_else(geo == "Estatal", "State", geo),
-         geo = if_else(geo == "Nacional", "National", geo),
-         geo = if_else(grepl("Inter", geo), "International", geo),
-         geo = if_else(grepl("Regional", geo), "Regional", geo)) %>% 
-  mutate(geo = str_to_title(geo)) %>% 
-  filter(!is.na(geo)) %>% 
-  tabyl(geo, survey) %>% 
-  add_row(geo = "Total", English = 482, Spanish  = 630) %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = geo, denom = "Total", value = value)
+ggplot(cloud_d, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by Latinos")
 ```
 
-Local news generally more popular than farther-out regions. Also note that one person wrote in Puerto Rico for the geographical question.
-
-```{r echo = F}
-response_geos %>%
-  filter(!is.na(share)) %>% 
-  filter(geo %in% c("Local", "State", "Regional", "National", "International")) %>% 
-  mutate(geo = as.factor(geo),
-         geo = fct_relevel(geo, "Local", "State", "Regional", "National", "International")) %>% 
-  ggplot(aes(x = geo, y = share)) +
-  geom_col(width = .8) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
-  facet_grid(rows = vars(survey), switch = "y") +
-  theme(axis.text.y = element_blank()) +
-  labs(x = NULL, y = NULL, title = "Respondents by geographical interest")
-```
-
-## Topics
+Facebook stands out among Spanish speakers
 
 ```{r}
-#Also hard coded denoms.
+ggplot(cloud_e, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by Spanish-speakers at home")
 
-eng_topics_under40 <- read_english %>% 
-  select(id, Q3) %>% 
-  left_join(age, by = "id") %>% 
-  filter(age == "under_40") %>% 
-  select(Q3)
+ggplot(cloud_f, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by English-speakers at home")
 
-eng_topics_over40 <- read_english %>% 
-  select(id, Q3) %>% 
-  left_join(age, by = "id") %>% 
-  filter(age == "over_40") %>% 
-  select(Q3)
-
-spn_topics_under40 <- read_spanish %>% 
-  select(id, Q3) %>% 
-  left_join(age, by = "id") %>% 
-  filter(age == "under_40") %>% 
-  select(Q3)
-
-spn_topics_over40 <- read_spanish %>% 
-  select(id, Q3) %>% 
-  left_join(age, by = "id") %>% 
-  filter(age == "over_40") %>% 
-  select(Q3)
-
-eng_topic_list1 <- tibble(topic = c(str_split(eng_topics_under40$Q3, ";(?=[A-Z])", simplify = T)),
-                         age = "under_40",
-                         survey = "English")
-eng_topic_list2 <- tibble(topic = c(str_split(eng_topics_over40$Q3, ";(?=[A-Z])", simplify = T)),
-                         age = "over_40",
-                         survey = "English")
-spn_topic_list1 <- tibble(topic = c(str_split(spn_topics_under40$Q3, ";(?=[A-Z])", simplify = T)),
-                         age = "under_40",
-                         survey = "Spanish")
-spn_topic_list2 <- tibble(topic = c(str_split(spn_topics_over40$Q3, ";(?=[A-Z])", simplify = T)),
-                         age = "over_40",
-                         survey = "Spanish")
-
-denoms <- tibble(survey = c(rep("English", 2), rep("Spanish", 2)),
-                 age = c("under_40", "over_40", "under_40", "over_40"),
-                 total = c(182, 284, 222, 399))
-
-response_topic <- bind_rows(eng_topic_list1, eng_topic_list2, spn_topic_list1, spn_topic_list2) %>%
-  filter(!is.na(age)) %>% 
-  filter(topic != "") %>% 
-  filter(!topic == "None") %>% 
-  filter(!grepl("ratings", topic)) %>% #medical facilities = health
-  add_row(topic = "Health", survey = "English") %>% 
-  mutate(topic = if_else(grepl("arte", topic), "Music, arts, and culture", topic),
-         topic = if_else(grepl("Educ", topic), "Education", topic),
-         topic = if_else(grepl("Negocios", topic), "Local businesses", topic),
-         topic = if_else(grepl("Eventos", topic), "Local events", topic),
-         topic = if_else(grepl("Políticas", topic), "Politics", topic),
-         topic = if_else(grepl("Salud", topic), "Health", topic),
-         topic = if_else(grepl("Deportes", topic), "Sports", topic),
-         topic = if_else(grepl("resources|Recursos", topic), "Community resources", topic),
-         topic = if_else(grepl("Diversidad", topic), "Diversity and social justice", topic),
-         topic = if_else(grepl("Tecno", topic), "Technology", topic),
-         topic = if_else(grepl("Finanzas", topic), "Finance, wealth, and financial literacy", topic),
-         topic = if_else(grepl("Oport", topic), "Opportunities for community engagement", topic),
-         topic = if_else(grepl("Viajes", topic), "Travel and hospitality", topic),
-         topic = if_else(grepl("cambio", topic), "Environmental issues & climate change", topic),
-         topic = if_else(grepl("vivienda", topic), "Real estate and homeownership", topic),
-         topic = if_else(topic == "Comida", "Food", topic)) %>% 
-  mutate(topic = str_replace(topic, "&", "and"),
-         topic = str_replace(topic, "Environmental", "Env."),
-         topic = str_replace(topic, "Opportunities", "Opps."),
-         topic = str_replace(topic, "Community", "Comm."),
-         topic = str_replace(topic, "community", "comm.")) %>% 
-  group_by(survey, age, topic) %>% 
-  count() %>% 
-  ungroup() %>% 
-  left_join(denoms, by = c("survey", "age")) %>% 
-  rowwise() %>% 
-  mutate(share = n / total) %>% 
-  ungroup()
+ggplot(cloud_g, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by bilingual people at home")
 ```
-
-Over and under 40 for the English language survey have the same top 5 or so topics of interest with Education, Music/Arts/Culture, and Health topping the lists.
-
-```{r fig.height=6}
-response_topic %>% 
-  filter(survey == "English", n >= 10) %>% 
-  ggplot(aes(x = share, y = reorder(topic, share))) +
-  geom_col() +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
-  facet_grid(cols = vars(age)) +
-  labs(title = "Topics of interest by age, English survey respondents", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
-```
-
-Health and Education top the list for Spanish survey respondents in both age groups. For younger people, the next three are Sports, Politics, and Music/Arts/Culture. For older people it's Sports, Music/Arts/Culture, and Local Events.
-
-```{r fig.height=6}
-response_topic %>% 
-  filter(survey == "Spanish", n >= 10) %>% 
-  ggplot(aes(x = share, y = reorder(topic, share))) +
-  geom_col() +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.1) +
-  facet_grid(cols = vars(age)) +
-  labs(title = "Topics of interest by age, Spanish survey respondents", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
-```
-
-## Special topics
-
-```{r}
-eng_special_topic <- tibble(topic = c(str_split(read_english$Q4, ";(?=[A-Z])", simplify = T)),
-                    survey = "English") %>% 
-  mutate(topic = str_remove(topic, "Topics related to "))
-spn_special_topic <- tibble(topic = c(str_split(read_spanish$Q4, ";(?=[A-Z])", simplify = T)),
-                    survey = "Spanish") %>% 
-  mutate(topic = str_remove(topic, "Temas acerca de "))
-
-response_special_topic <- bind_rows(eng_special_topic, spn_special_topic) %>%
-  filter(topic != "") %>% 
-  mutate(topic = str_to_sentence(topic)) %>% 
-  mutate(topic = if_else(grepl("Familias", topic), "Families with children", topic),
-         topic = if_else(grepl("Propietarios", topic), "Small business owners", topic),
-         topic = if_else(grepl("edad", topic), "Seniors", topic),
-         topic = if_else(grepl("Los", topic), "Teens", topic),
-         topic = if_else(grepl("Jóvenes|adolescentes", topic), "Young adults", topic),
-         topic = if_else(grepl("Participacion", topic), "Community engagement", topic)) %>%
-  filter(!topic %in% c("None of these", "No", "Ninguno de estos")) %>% 
-  filter(!grepl("subscribe", topic)) %>% 
-  tabyl(topic, survey) %>% 
-  add_row(topic = "Total", English = 482, Spanish  = 630) %>% 
-  pivot_longer(cols = English:Spanish, names_to = "survey", values_to = "value") %>% 
-  group_by(survey) %>% 
-  calc_shares(group = topic, denom = "Total", value = value)
-```
-
-Special topic areas being primarily focused on families makes sense with who we're surveying and how we're collecting responses.
-
-```{r}
-response_special_topic %>% 
-  filter(value > 1) %>% 
-  filter(!is.na(share)) %>% 
-  mutate(topic = as.factor(topic),
-         topic = fct_rev(topic)) %>% 
-  ggplot(aes(x = share, y = reorder(topic, share))) +
-  geom_col(width = .8) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
-  facet_grid(cols = vars(survey)) +
-  theme(axis.text.x = element_blank()) +
-  labs(y = "Topics relevant to...", x = NULL, title = "Share of respondents by special topic area")
-```
-
