@@ -26,13 +26,13 @@ age-based breakdowns later.
 
 **Also we are now HEAVILY skewed towards middle-aged women**
 
-| gender           |   n |
-|:-----------------|----:|
-| Woman            | 963 |
-| Man              | 635 |
-| NA               |  19 |
-| Opt out          |   7 |
-| Transgender & NB |   7 |
+| gender           |   n | share |
+|:-----------------|----:|:------|
+| Woman            | 963 | 60%   |
+| Man              | 635 | 39%   |
+| NA               |  19 | 1%    |
+| Opt out          |   7 | 0%    |
+| Transgender & NB |   7 | 0%    |
 
 ![](demographics_files/figure-gfm/gender-1.png)<!-- -->
 
@@ -46,21 +46,55 @@ Someone asked to see the top 5 towns
 
 Slightly lower shares of older adults identifying as Latino
 
-| latino  |    n |
-|:--------|-----:|
-| Yes     | 1272 |
-| No      |  301 |
-| Opt out |   38 |
-| NA      |   20 |
-
 ![](demographics_files/figure-gfm/ethnicity-1.png)<!-- -->
 
 ## Place of birth x age
 
+Unsurprisingly, young people more likely to be born in the US/PR. I am
+surprised at the diversity in the 30-49 crowd.
+
+| place_of_birth     |   n | share |
+|:-------------------|----:|:------|
+| DOMINICAN REPUBLIC |  65 | 4%    |
+| ECUADOR            | 172 | 11%   |
+| MEXICO             | 209 | 13%   |
+| OTHER              | 277 | 17%   |
+| PUERTO RICO        | 358 | 22%   |
+| USA                | 550 | 34%   |
+
+![](demographics_files/figure-gfm/pob-1.png)<!-- -->
+
 ## Language spoken at home x age
+
+Pretty even language split among older adults. The majority of younger
+people speak both English and Spanish at home.
+
+| language                 |   n | share |
+|:-------------------------|----:|:------|
+| Both English and Spanish | 683 | 43%   |
+| English                  | 379 | 24%   |
+| Spanish                  | 511 | 32%   |
+
+![](demographics_files/figure-gfm/lang_at_home-1.png)<!-- -->
 
 ## Internet-enabled devices and internet at home x age
 
-## Registered voter
+Notable increase in lack of internet in older age groups; lack of device
+corresponds with lack of internet.
+
+![](demographics_files/figure-gfm/internet-1.png)<!-- -->
+
+![](demographics_files/figure-gfm/device-1.png)<!-- -->
+
+## Registered voter x age x gender
+
+What the heck, young women?!
+
+![](demographics_files/figure-gfm/voter-1.png)<!-- -->
 
 ## Other demographic details
+
+Unsurprisingly, almost all the young people are students, middle aged
+adults have kids under 18. Few business owners.
+
+![](demographics_files/figure-gfm/person_type-1.png)<!-- -->
