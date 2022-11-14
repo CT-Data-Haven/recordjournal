@@ -13,8 +13,6 @@ library(cwi)
 library(janitor)
 library(camiller)
 source("../utils/plot_utils.R")
-
-#Cannot just re-run this! some denoms are hard-coded for non-response, and there's some text mining
 ```
 
 ```{r paths}
