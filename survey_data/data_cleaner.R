@@ -123,7 +123,7 @@ x8 <- x7 %>%
   mutate(Q11 = if_else(grepl("app|online|noticias|online news|online local|Internet", Q11), "News apps/news websites", as.character(Q11)),
          Q11 = if_else(Q11 %in% c("Medios sociales"), "Social media", Q11),
          Q11 = if_else(grepl("Amistades|Friends|Familiares|Family", Q11), "Social circles", Q11),
-         Q11 = if_else(grepl("Correo|email", Q11), "Email/newsletters", Q11),
+         Q11 = if_else(grepl("Correo|email|Email", Q11), "Email/newsletter", Q11),
          Q11 = if_else(grepl("Periódicos", Q11), "Newspapers", Q11),
          Q11 = if_else(grepl("Textos|Celular", Q11), "Text message", Q11),
          Q11 = if_else(grepl("odcast", Q11), "Podcast", Q11)) %>%
@@ -134,7 +134,7 @@ x9 <- x8 %>%
   mutate(Q9 = if_else(grepl("app|online|noticias|online news|online local|Internet", Q9), "News apps/news websites", as.character(Q9)),
          Q9 = if_else(Q9 %in% c("Medios sociales"), "Social media", Q9),
          Q9 = if_else(grepl("Amistades|Friends|Familiares|Family", Q9), "Social circles", Q9),
-         Q9 = if_else(grepl("Correo|email", Q9), "Email/newsletters", Q9),
+         Q9 = if_else(grepl("Correo|email|Email", Q9), "Email/newsletter", Q9),
          Q9 = if_else(grepl("Periódicos", Q9), "Newspapers", Q9),
          Q9 = if_else(grepl("Textos|Celular", Q9), "Text message", Q9),
          Q9 = if_else(grepl("odcast", Q9), "Podcast", Q9)) %>%
