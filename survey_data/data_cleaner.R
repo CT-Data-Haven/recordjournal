@@ -171,9 +171,9 @@ x11 <- x10 %>%
   rename(trust_news_from_social_circle = A) %>%
   select(-Q12, -Q13, -Q14, -Q15)
 
-agreetib <- tibble(Q16 = c("Agree", "De acuerdo", "Neutral", "Disagreee", "En desacuerdo"),
-              Q17 = c("Agree", "De acuerdo", "Neutral", "Disagreee", "En desacuerdo"),
-              Q18 = c("Agree", "De acuerdo", "Neutral", "Disagreee", "En desacuerdo"),
+agreetib <- tibble(Q16 = c("Agree", "De acuerdo", "Neutral", "Disagree", "En desacuerdo"),
+              Q17 = c("Agree", "De acuerdo", "Neutral", "Disagree", "En desacuerdo"),
+              Q18 = c("Agree", "De acuerdo", "Neutral", "Disagree", "En desacuerdo"),
               A = c(rep("Agree", 2), "Neutral", rep("Disagree", 2)))
 
 x12 <- x11 %>%
