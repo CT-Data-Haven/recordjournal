@@ -1,39 +1,44 @@
 Trust in news media
 ================
 
-Add PR festival data, hard code paths since it won’t change, bind to
-primary surveys.
+## Trustworthiness by source by group
 
-Just realized I deleted an entire section from the English PR Festival
-survey… I’ll summarize what we have for the Spanish respondents, but the
-questions were those about what content they’d like to see.
+Local news tops the trustworthiness list among all age groups. Older
+adults are more skeptical of social media/social circles. I wonder if
+that’s related to whether or not they even use those sources.
 
-Both age groups for the English survey seem to trust local news while
-being mostly ambivalent about the other sources. Older adults have more
-trust in national news. Social media is the least trusted.
+![](trust_files/figure-gfm/age_trust-1.png)<!-- -->
 
-![](trust_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+Latinos trust social media news at about twice the rate of non-Latinos.
+Again local news tops the list, but Latinos also trust national news
+sources (Telemundo, etc.) at a higher rate than non-Latinos. Again, like
+social media among older people, I wonder if it’s that non-Latinos tend
+to prefer local news.
 
-Higher levels of trust among Spanish respondents, with national news
-topping the list. I’d still call this a tossup overall.
+![](trust_files/figure-gfm/latino_trust-1.png)<!-- -->
 
-![](trust_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+Similar trend in people who speak Spanish or both languages at home–
+greater trust in national news sources. People who speak English at home
+generally distrust social media more.
+
+![](trust_files/figure-gfm/lang_trust-1.png)<!-- -->
 
 ## Beliefs
 
-Still interesting that about half of younger English survey respondents
-trust local news but don’t agree with these statements… mismatch in
-preferred coverage while thinking the existing coverage is accurate?
-Majorities of the over-40 crowd of English respondents trust sources of
-local news and feel it’s covers issues important to them, but don’t
-necessarily agree the news reflects their own beliefs.
+For younger and older adults, majorities believe the news covers
+important topics and they trust the sources of news they get, but
+there’s a lot of ambivalence about whether news reflects their values,
+although a plurality of older adults agree with that.
 
-![](trust_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](trust_files/figure-gfm/beliefs_age-1.png)<!-- -->
 
-Generally higher levels of agreement here, but still a tossup for
-younger respondents. Thinking about topics, younger populations seemed
-to want more arts/culture and events where older adults were interested
-in big topics like health or education. Still the majority of both age
-groups believe the local news covers issues important to them.
+No real dissimilarities here. These probably trend towards general
+totals.
 
-![](trust_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](trust_files/figure-gfm/beliefs_latino-1.png)<!-- -->
+
+People who speak Spanish at home are more likely to agree that local
+news reflects their beliefs. I wonder if this is influenced by the fact
+people are answering this survey for their local paper.
+
+![](trust_files/figure-gfm/beliefs_lang-1.png)<!-- -->

@@ -7,238 +7,223 @@ output: github_document
 knitr::opts_chunk$set(echo = F, warning = F, message = F)
 ```
 
-```{r}
+```{r libraries}
 library(tidyverse)
 library(cwi)
 library(janitor)
 library(camiller)
 source("../utils/plot_utils.R")
-
-#Cannot just re-run this! some denoms are hard-coded for non-response, and there's some text mining
 ```
 
-```{r}
-path <- "../survey_data/09142022/"
+```{r paths}
+path <- "../survey_data/11082022/"
 plot_path <- "../distro/"
+read <- read_csv(paste(path, "clean.csv")) %>% 
+  rename(age = big_age_band)
 ```
 
-```{r}
-read_english <- read_csv(paste(path, "(English) RJ Latino Communities Reporting Lab Survey.csv", sep = "")) %>% 
-  clean_names()
+## Trustworthiness by source by group
 
-read_spanish <- read_csv(paste(path, "(Spanish) RJ Latino Communities Reporting Lab Survey.csv", sep = "")) %>% 
-  clean_names()
-
-qhead_eng <- tibble(question = paste("Q", 1:32, sep = ""),
-                    label = colnames(read_english))
-qhead_spn <- tibble(question = paste("Q", 1:32, sep = ""),
-                    label = colnames(read_spanish))
-
-colnames(read_english) <- qhead_eng$question
-colnames(read_spanish) <- qhead_eng$question
-
-read_english <- read_english %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
-read_spanish <- read_spanish %>% select(-Q29, -Q30, -Q31) %>% remove_empty("rows")
+```{r make_trust}
+trust <- read %>% 
+  select(age, latino, language, trust_national_news, trust_local_news, trust_social_media_news, trust_news_from_social_circle) %>% 
+  pivot_longer(cols = starts_with("trust"), names_to = "level", names_prefix = "trust_", values_to = "response") %>%
+  pivot_longer(cols = age:language, names_to = "category", values_to = "group")
 ```
 
-Add PR festival data, hard code paths since it won't change, bind to primary surveys.
+Local news tops the trustworthiness list among all age groups. Older adults are more skeptical of social media/social circles. I wonder if that's related to whether or not they even use those sources.
 
-Just realized I deleted an entire section from the English PR Festival survey... I'll summarize what we have for the Spanish respondents, but the questions were those about what content they'd like to see.
-
-```{r}
-read_english_pr <- read_csv("../survey_data/08302022/(English - PR) RJ Latino Communities Reporting Lab Survey 2 2.csv") %>% 
-  clean_names() %>% 
-  mutate(`are_you_interested_in_news_at_the_following_geographical_levels_select_all_that_apply` = NA,
-         `which_of_these_topics_interest_you_most_select_up_to_five` = NA,
-         `do_any_of_these_special_stories_interest_you_select_all_that_apply` = NA,
-         `are_there_any_specific_stories_you_would_like_to_see_more_of_in_local_news_for_example_investigative_articles_business_profiles_opinion_columns_cartoons_etc` = NA) %>% 
-  select(timestamp, `are_you_interested_in_news_at_the_following_geographical_levels_select_all_that_apply`, `which_of_these_topics_interest_you_most_select_up_to_five`, `do_any_of_these_special_stories_interest_you_select_all_that_apply`, `are_there_any_specific_stories_you_would_like_to_see_more_of_in_local_news_for_example_investigative_articles_business_profiles_opinion_columns_cartoons_etc`, everything())
-
-read_spanish_pr <- read_csv("../survey_data/08302022/(Spanish - PR) RJ Latino Communities Reporting Lab Survey (Responses) - Form Responses.csv") %>% 
-  clean_names()
-
-qhead_eng_pr <- tibble(question = paste("Q", 1:29, sep = ""),
-                    label = colnames(read_english_pr))
-qhead_spn_pr <- tibble(question = paste("Q", 1:29, sep = ""),
-                    label = colnames(read_spanish_pr))
-
-colnames(read_english_pr) <- qhead_spn_pr$question
-colnames(read_spanish_pr) <- qhead_spn_pr$question
-
-read_english_pr <- read_english_pr %>% remove_empty("rows")
-read_spanish_pr <- read_spanish_pr %>% remove_empty("rows")
-
-read_english <- read_english %>% bind_rows(read_english_pr) %>% rename(id = Q1)
-read_spanish <- read_spanish %>% bind_rows(read_spanish_pr) %>% rename(id = Q1)
-```
-
-```{r}
-age <- tibble(id = read_english$id,
-              age = as.factor(read_english$Q22),
-              survey = as.factor("English")) %>% 
-  bind_rows(tibble(id = read_spanish$id,
-                   age = as.factor(read_spanish$Q22),
-                   survey = as.factor("Spanish"))) %>% 
-  filter(!is.na(age)) %>% 
-  mutate(age = if_else(age == "70 o mayor", "70 or older", as.character(age)),
-         age = if_else(age == "Menor de 18", "Under 18", age)) %>% 
-  filter(!age %in% c("Prefiero no decir", "Prefer not to say")) %>% 
-  mutate(age = as.factor(age),
-         age = fct_relevel(age, "Under 18", after = 0L)) %>% 
-  mutate(age = fct_collapse(age, under_40 = c("Under 18", "18-29", "30-39"), over_40 = c("40-49", "50-59", "60-69", "70 or older")))
-```
-
-```{r}
-denoms <- tibble(survey = c(rep("English", 2), rep("Spanish", 2)),
-                 age = c("under_40", "over_40", "under_40", "over_40"),
-                 total = c(182, 222, 284, 399))
-
-trust <- tibble(id = read_english$id,
-                national_news = as.factor(read_english$Q12),
-                local_news = as.factor(read_english$Q13),
-                social_media = as.factor(read_english$Q14),
-                social_circle = as.factor(read_english$Q15),
-                survey = as.factor("English")) %>% 
-  bind_rows(tibble(id = read_spanish$id,
-                   national_news = as.factor(read_spanish$Q12),
-                   local_news = as.factor(read_spanish$Q13),
-                   social_media = as.factor(read_spanish$Q14),
-                   social_circle = as.factor(read_spanish$Q15),
-                   survey = as.factor("Spanish"))) %>% 
-  pivot_longer(cols = national_news:social_circle, names_to = "level", values_to = "response") %>% 
-  mutate(response = fct_collapse(response, `A lot` = c("A lot", "Mucho"),
-                                 Some = c("Some", "Un poco"),
-                                 `Not at all` = c("Not at all", "Para nada"))) %>% 
-  left_join(age, by = c("survey", "id")) %>% 
-  select(-id) %>% 
-  group_by(age, survey, level, response) %>% 
+```{r age_trust}
+age_trust <- trust %>% 
+  filter(category == "age", !is.na(group), !is.na(response)) %>% 
+  group_by(category, group, level, response) %>% 
   count() %>% 
+  pivot_wider(id_cols = c("category", "group", "level"), names_from = "response", values_from = "n") %>% 
   ungroup() %>% 
-  filter(!is.na(age), !is.na(response)) %>% 
-  pivot_wider(id_cols = c("survey", "age", "level"), names_from = "response", values_from = "n") %>% 
   rowwise() %>% 
-  mutate(total = sum(`A lot` + Some + `Not at all`)) %>% 
-  pivot_longer(cols = `A lot`:total, names_to = "response", values_to = "value") %>% 
-  mutate(level = str_replace(level, "_", " "),
-         level = str_to_sentence(level)) %>% 
-  group_by(age, survey, level) %>% 
-  camiller::calc_shares(group = response, denom = "total", value = value)
+  mutate(Total = sum(`A lot`, Some, `Not at all`)) %>% 
+  pivot_longer(cols = c("A lot", "Some", "Not at all", "Total"), names_to = "response", values_to = "n") %>%
+  mutate(response = as.factor(response) %>% fct_relevel(., "A lot", "Some", "Not at all")) %>% 
+  group_by(category, group, level) %>% 
+  calc_shares(group = response, denom = "Total", value = n)
+
+age_trust %>% 
+  mutate(response = fct_rev(response)) %>% 
+  ggplot(aes(x = share, y = level, group = response)) +
+  geom_col(aes(fill = response), width = .8, position = position_stack(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  guides(fill = guide_legend(reverse = T)) +
+  facet_wrap(~group) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  scale_fill_manual(values = unname(qual_pal[c("gray", "teal", "pink")])) +
+  labs(title = "Trust in different sources of news, by age", x = NULL, y = NULL)
 ```
 
-Both age groups for the English survey seem to trust local news while being mostly ambivalent about the other sources. Older adults have more trust in national news. Social media is the least trusted.
+Latinos trust social media news at about twice the rate of non-Latinos. Again local news tops the list, but Latinos also trust national news sources (Telemundo, etc.) at a higher rate than non-Latinos. Again, like social media among older people, I wonder if it's that non-Latinos tend to prefer local news.
 
-```{r fig.width=6}
-trust %>% 
-  filter(survey == "English") %>% 
-  filter(!is.na(share)) %>% 
-  mutate(response = fct_relevel(response, "A lot", "Some", "Not at all"),
-         response = fct_rev(response),
-         level = as.factor(level),
-         level = fct_relevel(level, "National news", "Local news", "Social media", "Social circle"),
-         level = fct_rev(level)) %>% 
-  ggplot(aes(x = share, y = level, fill = response)) +
-  geom_col(position = position_stack(.5), width = .8) +
-  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
-  facet_grid(cols = vars(age)) +
-  scale_fill_manual(values = rev(opinion_pal)) +
-  guides(fill = guide_legend(title = "Trust in source:", reverse = T)) +
-  theme(axis.text.x = element_blank(),
-        legend.position = "bottom") +
-  labs(x = NULL, y = NULL, title = str_wrap("Share of respondents who trust news sources by age, English language respondents", 70))
+```{r latino_trust}
+latino_trust <- trust %>% 
+  filter(category == "latino", !is.na(group), !is.na(response)) %>% 
+  group_by(category, group, level, response) %>% 
+  count() %>% 
+  pivot_wider(id_cols = c("category", "group", "level"), names_from = "response", values_from = "n") %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(Total = sum(`A lot`, Some, `Not at all`)) %>% 
+  pivot_longer(cols = c("A lot", "Some", "Not at all", "Total"), names_to = "response", values_to = "n") %>%
+  mutate(response = as.factor(response) %>% fct_relevel(., "A lot", "Some", "Not at all")) %>% 
+  group_by(category, group, level) %>% 
+  calc_shares(group = response, denom = "Total", value = n)
+
+latino_trust %>% 
+  filter(group != "Opt out") %>% 
+  mutate(response = fct_rev(response)) %>% 
+  ggplot(aes(x = share, y = level, group = response)) +
+  geom_col(aes(fill = response), width = .8, position = position_stack(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  guides(fill = guide_legend(reverse = T)) +
+  facet_wrap(~group) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  scale_fill_manual(values = unname(qual_pal[c("gray", "teal", "pink")])) +
+  labs(title = "Trust in different sources of news, by ethnicity", subtitle = "Yes/No refers to rwhether respondent identifies as Latino/Latina/Latinx", x = NULL, y = NULL)
 ```
 
-Higher levels of trust among Spanish respondents, with national news topping the list. I'd still call this a tossup overall.
+Similar trend in people who speak Spanish or both languages at home-- greater trust in national news sources. People who speak English at home generally distrust social media more.
 
-```{r fig.width=6}
-trust %>% 
-  filter(survey == "Spanish") %>% 
-  filter(!is.na(share)) %>% 
-  mutate(response = fct_relevel(response, "A lot", "Some", "Not at all"),
-         response = fct_rev(response),
-         level = as.factor(level),
-         level = fct_relevel(level, "National news", "Local news", "Social media", "Social circle"),
-         level = fct_rev(level)) %>% 
-  ggplot(aes(x = share, y = level, fill = response)) +
-  geom_col(position = position_stack(.5), width = .8) +
-  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
-  facet_grid(cols = vars(age)) +
-  scale_fill_manual(values = rev(opinion_pal)) +
-  guides(fill = guide_legend(title = "Trust in source:", reverse = T)) +
-  theme(axis.text.x = element_blank(),
-        legend.position = "bottom") +
-  labs(x = NULL, y = NULL, title = str_wrap("Share of respondents who trust news sources by age, Spanish language respondents", 70))
+```{r lang_trust}
+lang_trust <- trust %>% 
+  filter(category == "language", !is.na(group), !is.na(response)) %>% 
+  group_by(category, group, level, response) %>% 
+  count() %>% 
+  pivot_wider(id_cols = c("category", "group", "level"), names_from = "response", values_from = "n") %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(Total = sum(`A lot`, Some, `Not at all`)) %>% 
+  pivot_longer(cols = c("A lot", "Some", "Not at all", "Total"), names_to = "response", values_to = "n") %>%
+  mutate(response = as.factor(response) %>% fct_relevel(., "A lot", "Some", "Not at all")) %>% 
+  group_by(category, group, level) %>% 
+  calc_shares(group = response, denom = "Total", value = n)
+
+lang_trust %>% 
+  filter(group != "Opt out") %>% 
+  mutate(response = fct_rev(response)) %>% 
+  ggplot(aes(x = share, y = level, group = response)) +
+  geom_col(aes(fill = response), width = .8, position = position_stack(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  guides(fill = guide_legend(reverse = T)) +
+  facet_wrap(~group) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  scale_fill_manual(values = unname(qual_pal[c("gray", "teal", "pink")])) +
+  labs(title = "Trust in different sources of news, by language spoken at home", x = NULL, y = NULL)
 ```
 
 ## Beliefs
 
-```{r}
-labels <- tibble(code = c("Q1", "Q2", "Q3"), 
-            question = c("I trust the sources of news I get about my community", "The local news covers issues that are important to me", "The local news reflects my beliefs and customs"))
-                         
-beliefs <- tibble(id = read_english$id, 
-                  Q1 = read_english$Q16,
-                Q2 = read_english$Q17,
-                Q3 = read_english$Q18,
-                survey = as.factor("English")) %>% 
-  bind_rows(tibble(id = read_spanish$id,
-                   Q1 = read_spanish$Q16,
-                   Q2 = read_spanish$Q17,
-                   Q3 = read_spanish$Q18,
-                   survey = as.factor("Spanish"))) %>% 
-  pivot_longer(cols = Q1:Q3, names_to = "code", values_to = "response") %>% 
-  mutate(response = if_else(response == "De acuerdo", "Agree", response),
-         response = if_else(response == "En desacuerdo", "Disagree", response)) %>% 
-  left_join(age, by = c("survey", "id")) %>% 
-  select(-id) %>% 
-  group_by(age, survey, code, response) %>% 
+```{r make_believe}
+beliefs <- read %>% 
+  select(age, latino, language, trust_sources_of_news_about_my_community, local_news_covers_issues_important_to_me, local_news_reflects_my_beliefs_values) %>% 
+  pivot_longer(cols = c("trust_sources_of_news_about_my_community", "local_news_covers_issues_important_to_me", "local_news_reflects_my_beliefs_values"), names_to = "question", values_to = "response") %>%
+  mutate(question = str_replace_all(question, "_", " "),
+         question = str_replace(question, "trust", "I trust"),
+         question = str_to_sentence(question)) %>% 
+  pivot_longer(cols = age:language, names_to = "category", values_to = "group")
+```
+
+For younger and older adults, majorities believe the news covers important topics and they trust the sources of news they get, but there's a lot of ambivalence about whether news reflects their values, although a plurality of older adults agree with that.
+
+```{r beliefs_age}
+age_beliefs <- beliefs %>% 
+  filter(category == "age", !is.na(group), !is.na(response)) %>% 
+  group_by(category, group, question, response) %>% 
   count() %>% 
+  pivot_wider(id_cols = c("category", "group", "question"), names_from = "response", values_from = "n") %>% 
   ungroup() %>% 
-  left_join(labels, by = "code") %>% 
-  select(-code) %>% 
-  filter(!is.na(age), !is.na(response)) %>% 
-  pivot_wider(id_cols = c("survey", "question", "age"), names_from = "response", values_from = "n") %>% 
   rowwise() %>% 
-  mutate(total = sum(Agree + Disagree + Neutral, na.rm = T)) %>% 
-  pivot_longer(cols = Agree:total, names_to = "response", values_to = "value") %>% 
-  group_by(age, survey, question) %>% 
-  camiller::calc_shares(group = response, denom = "total", value = value) %>% 
-  ungroup()
+  mutate(Total = sum(Neutral, Agree, Disagree)) %>% 
+  pivot_longer(cols = c("Neutral", "Agree", "Disagree", "Total"), names_to = "response", values_to = "n") %>%
+  group_by(category, group, question) %>% 
+  calc_shares(group = response, denom = "Total", value = n) %>% 
+  ungroup() %>% 
+  mutate(response = as.factor(response) %>% fct_relevel(., "Agree", "Neutral", "Disagree"))
+
+
+age_beliefs %>% 
+  mutate(response = fct_rev(response)) %>% 
+  mutate(question = str_wrap(question, 20)) %>% 
+  ggplot(aes(x = share, y = question, group = response)) +
+  geom_col(aes(fill = response), width = .8, position = position_stack(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  guides(fill = guide_legend(reverse = T)) +
+  facet_wrap(~group) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  scale_fill_manual(values = unname(qual_pal[c("gray", "teal", "pink")])) +
+  labs(title = "Belief/agreement with statements, by age", x = NULL, y = NULL)
 ```
 
-Still interesting that about half of younger English survey respondents trust local news but don't agree with these statements... mismatch in preferred coverage while thinking the existing coverage is accurate? Majorities of the over-40 crowd of English respondents trust sources of local news and feel it's covers issues important to them, but don't necessarily agree the news reflects their own beliefs.
+No real dissimilarities here. These probably trend towards general totals.
 
-```{r echo = F}
-beliefs %>% 
-  filter(survey == "English") %>% 
-  mutate(response = as.factor(response),
-         response = fct_relevel(response, "Agree", "Neutral", "Disagree"),
-         response = fct_rev(response)) %>% 
-  ggplot(aes(x = share, y = str_wrap(question, 25), fill = response)) +
-  geom_col(position = position_stack(), width = .8) +
-  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
-  facet_grid(cols = vars(age)) +
-  scale_fill_manual(values = rev(opinion_pal)) +
-  guides(fill = guide_legend(title = NULL, reverse = T)) +
-  theme(axis.text.x = element_blank(),
-        legend.position = "bottom") +
-  labs(x = NULL, y = NULL, title = str_wrap("Share of English survey respondents agreeing with statements regarding trust in local news, by age", 70))
+```{r beliefs_latino}
+latino_beliefs <- beliefs %>% 
+  filter(category == "latino", !is.na(group), !is.na(response)) %>% 
+  filter(group != "Opt out") %>% 
+  group_by(category, group, question, response) %>% 
+  count() %>% 
+  pivot_wider(id_cols = c("category", "group", "question"), names_from = "response", values_from = "n") %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(Total = sum(Neutral, Agree, Disagree)) %>% 
+  pivot_longer(cols = c("Neutral", "Agree", "Disagree", "Total"), names_to = "response", values_to = "n") %>%
+  group_by(category, group, question) %>% 
+  calc_shares(group = response, denom = "Total", value = n) %>% 
+  ungroup() %>% 
+  mutate(response = as.factor(response) %>% fct_relevel(., "Agree", "Neutral", "Disagree"))
+
+latino_beliefs %>% 
+  mutate(response = fct_rev(response)) %>% 
+  mutate(question = str_wrap(question, 20)) %>% 
+  ggplot(aes(x = share, y = question, group = response)) +
+  geom_col(aes(fill = response), width = .8, position = position_stack(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  guides(fill = guide_legend(reverse = T)) +
+  facet_wrap(~group) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  scale_fill_manual(values = unname(qual_pal[c("gray", "teal", "pink")])) +
+  labs(title = "Belief/agreement with statements, by ethnity", 
+       subtitle = "Yes/No refers to whether respondent identifies as Latino/Latina/Latinx", x = NULL, y = NULL)
 ```
 
-Generally higher levels of agreement here, but still a tossup for younger respondents. Thinking about topics, younger populations seemed to want more arts/culture and events where older adults were interested in big topics like health or education. Still the majority of both age groups believe the local news covers issues important to them.
+People who speak Spanish at home are more likely to agree that local news reflects their beliefs. I wonder if this is influenced by the fact people are answering this survey for their local paper.
 
-```{r echo = F}
-beliefs %>% 
-  filter(survey == "Spanish") %>% 
-  mutate(response = as.factor(response),
-         response = fct_relevel(response, "Agree", "Neutral", "Disagree"),
-         response = fct_rev(response)) %>% 
-  ggplot(aes(x = share, y = str_wrap(question, 25), fill = response)) +
-  geom_col(position = position_stack(), width = .8) +
-  geom_text(data = . %>% filter(share >= .01), aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
-  facet_grid(cols = vars(age)) +
-  scale_fill_manual(values = rev(opinion_pal)) +
-  guides(fill = guide_legend(title = NULL, reverse = T)) +
-  theme(axis.text.x = element_blank(),
-        legend.position = "bottom") +
-  labs(x = NULL, y = NULL, title = str_wrap("Share of Spanish survey respondents agreeing with statements regarding trust in local news, by age", 70))
+```{r beliefs_lang}
+lang_beliefs <- beliefs %>% 
+  filter(category == "language", !is.na(group), !is.na(response)) %>% 
+  group_by(category, group, question, response) %>% 
+  count() %>% 
+  pivot_wider(id_cols = c("category", "group", "question"), names_from = "response", values_from = "n") %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(Total = sum(Neutral, Agree, Disagree)) %>% 
+  pivot_longer(cols = c("Neutral", "Agree", "Disagree", "Total"), names_to = "response", values_to = "n") %>%
+  group_by(category, group, question) %>% 
+  calc_shares(group = response, denom = "Total", value = n) %>% 
+  ungroup() %>% 
+  mutate(response = as.factor(response) %>% fct_relevel(., "Agree", "Neutral", "Disagree"))
+
+lang_beliefs %>% 
+  mutate(response = fct_rev(response)) %>% 
+  mutate(question = str_wrap(question, 20)) %>% 
+  ggplot(aes(x = share, y = question, group = response)) +
+  geom_col(aes(fill = response), width = .8, position = position_stack(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  guides(fill = guide_legend(reverse = T)) +
+  facet_wrap(~group) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  scale_fill_manual(values = unname(qual_pal[c("gray", "teal", "pink")])) +
+  labs(title = "Belief/agreement with statements, by language spoken at home", x = NULL, y = NULL)
 ```
