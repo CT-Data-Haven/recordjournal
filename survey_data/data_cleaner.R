@@ -182,7 +182,7 @@ x12 <- x11 %>%
   left_join(agreetib %>% select(Q17, A), by = "Q17") %>%
   rename(local_news_covers_issues_important_to_me = A) %>%
   left_join(agreetib %>% select(Q18, A), by = "Q18") %>%
-  rename(local_news_reflets_my_beliefs_values = A) %>%
+  rename(local_news_reflects_my_beliefs_values = A) %>%
   select(-Q16, -Q17, -Q18)
 
 final <- x12
