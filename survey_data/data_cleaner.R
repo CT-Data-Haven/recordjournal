@@ -185,6 +185,10 @@ x12 <- x11 %>%
   rename(local_news_reflects_my_beliefs_values = A) %>%
   select(-Q16, -Q17, -Q18)
 
-final <- x12
+x13 <- x12 %>%
+  mutate(latino_by_pob = if_else((latino == "Yes" & place_of_birth %in% c("USA", "PUERTO RICO")), "US-born Latino", "Not Latino")) %>%
+  mutate(latino_by_pob = if_else(latino == "Yes" & !place_of_birth %in% c("USA", "PUERTO RICO"), "Foreign-born Latino", latino_by_pob))
+
+final <- x13
 
 write_csv(final, paste(path, "clean.csv"))
