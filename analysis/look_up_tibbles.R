@@ -1,6 +1,6 @@
 library(tidyverse)
 
-age <- tibble(Q22 = c("Under 18", "Menor de 18", "20-29", "30-39", "40-49", "50-59", "60-69", "70 or older", "70 o mayor", "Prefer not to say", "Prefiero no decir"),
+age <- tibble(Q22 = c("Under 18", "Menor de 18", "18-29", "30-39", "40-49", "50-59", "60-69", "70 or older", "70 o mayor", "Prefer not to say", "Prefiero no decir"),
               age = c(rep("age00_29", 3), rep("age30_49", 2), rep("age50_99", 4), rep("Opt out", 2)))
 
 
