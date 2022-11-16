@@ -8,10 +8,9 @@ media. I think we can just look at “used.”
 
 ![](news_habits_files/figure-gfm/modes_used_preferred_total-1.png)<!-- -->
 
-I expected to see variation by age, but it’s hard to say anything about
-the under-30 crowd given their low response rate to this question.
-Social media just ekeing out ahead of TV for 30-49 year olds is
-interesting. We Milennials love a platform.
+I expected to see social media top the list for younger people. Social
+media just ekeing out ahead of TV for 30-49 year olds is interesting. We
+Milennials love a platform.
 
 ![](news_habits_files/figure-gfm/modes_age-1.png)<!-- -->
 
@@ -26,8 +25,8 @@ are really it.
 
 ## Preferred language by age and ethnicity
 
-Younger people really don’t seem to like *just* Spanish language
-content, but have a stronger overall preference for bilingual content.
+People under 50 have a slightly stronger overall preference for
+bilingual content.
 
 ![](news_habits_files/figure-gfm/lang_pref-1.png)<!-- -->
 

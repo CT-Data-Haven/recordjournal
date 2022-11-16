@@ -65,7 +65,7 @@ mode_bind %>%
   theme(axis.text.x = element_blank())
 ```
 
-I expected to see variation by age, but it's hard to say anything about the under-30 crowd given their low response rate to this question. Social media just ekeing out ahead of TV for 30-49 year olds is interesting. We Milennials love a platform.
+I expected to see social media top the list for younger people. Social media just ekeing out ahead of TV for 30-49 year olds is interesting. We Milennials love a platform.
 
 ```{r modes_age}
 agemode1 <- read %>% 
@@ -160,7 +160,7 @@ pobmode1 %>%
 
 ## Preferred language by age and ethnicity
 
-Younger people really don't seem to like *just* Spanish language content, but have a stronger overall preference for bilingual content.
+People under 50 have a slightly stronger overall preference for bilingual content.
 
 ```{r lang_pref}
 pref_age <- read %>% 

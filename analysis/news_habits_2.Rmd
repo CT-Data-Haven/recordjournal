@@ -185,7 +185,7 @@ topics %>%
   labs(title = "Topics of interest (all respondents)", x = NULL, y = NULL)
 ```
 
-I'm really surprised no young people selected environment/climate change. Music/arts/culture, sports, and technology top the list for young people. Health, education, and music/arts/culture for the other two groups.
+I'm really surprised such a small share of young people selected environment/climate change. Music/arts/culture, education, and sports top the list for young people. Health, education, and music/arts/culture for the other two groups.
 
 ```{r top_age}
 topics %>% 
@@ -211,7 +211,7 @@ topics %>%
   labs(title = "Topics of interest (by ethnicity)", subtitle = "Yes/No refers to whether respondent identifies as Latino/Latina/Latinx", x = NULL, y = NULL)
 ```
 
-Looks like people who speak English at home also have an interest in local events, otherwise health, education, and music top the lists still.
+Looks like people who speak English at home also have an interest in local events, otherwise health, education, and music top the lists still, but Spanish-speakers also like to read about sports.
 
 ```{r top_language}
 topics %>% 

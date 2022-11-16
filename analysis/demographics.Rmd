@@ -145,7 +145,7 @@ ethnicity %>%
 
 ## Place of birth x age
 
-Unsurprisingly, young people more likely to be born in the US/PR. I am surprised at the diversity in the 30-49 crowd.
+Younger and older people more likely to be born in the US/PR. I am surprised at the diversity in the 30-49 crowd.
 
 ```{r pob}
 age_totals <- read %>% 
@@ -189,7 +189,7 @@ pob %>%
 
 ## Language spoken at home x age
 
-Pretty even language split among older adults. The majority of younger people speak both English and Spanish at home.
+Pretty even language split among older adults.
 
 ```{r lang_at_home}
 lang_at_home <- read %>% 
@@ -229,7 +229,7 @@ lang_at_home %>%
 
 ## Internet-enabled devices and internet at home x age
 
-Notable increase in lack of internet in older age groups; lack of device corresponds with lack of internet.
+I'm kind of shocked at the under-30 lack of device/internet, but not at the notable increase in lack of internet in older age groups; lack of device corresponds with lack of internet.
 
 ```{r internet}
 internet <- read %>%
@@ -271,7 +271,7 @@ device %>%
 
 ## Registered voter x age x gender
 
-What the heck, young women?!
+This is pretty typical nationwide.
 
 ```{r voter}
 voter <- read %>% 
@@ -298,7 +298,7 @@ voter %>%
 
 ## Other demographic details
 
-Unsurprisingly, almost all the young people are students, middle aged adults have kids under 18. Few business owners.
+Unsurprisingly, half of the students are younger people, middle aged adults have kids under 18. Few business owners.
 
 ```{r person_type}
 person_type <- read %>%

@@ -50,7 +50,7 @@ Slightly lower shares of older adults identifying as Latino
 
 ## Place of birth x age
 
-Unsurprisingly, young people more likely to be born in the US/PR. I am
+Younger and older people more likely to be born in the US/PR. I am
 surprised at the diversity in the 30-49 crowd.
 
 | place_of_birth     |   n | share |
@@ -66,8 +66,7 @@ surprised at the diversity in the 30-49 crowd.
 
 ## Language spoken at home x age
 
-Pretty even language split among older adults. The majority of younger
-people speak both English and Spanish at home.
+Pretty even language split among older adults.
 
 | language                 |   n | share |
 |:-------------------------|----:|:------|
@@ -79,8 +78,9 @@ people speak both English and Spanish at home.
 
 ## Internet-enabled devices and internet at home x age
 
-Notable increase in lack of internet in older age groups; lack of device
-corresponds with lack of internet.
+I’m kind of shocked at the under-30 lack of device/internet, but not at
+the notable increase in lack of internet in older age groups; lack of
+device corresponds with lack of internet.
 
 ![](demographics_files/figure-gfm/internet-1.png)<!-- -->
 
@@ -88,13 +88,13 @@ corresponds with lack of internet.
 
 ## Registered voter x age x gender
 
-What the heck, young women?!
+This is pretty typical nationwide.
 
 ![](demographics_files/figure-gfm/voter-1.png)<!-- -->
 
 ## Other demographic details
 
-Unsurprisingly, almost all the young people are students, middle aged
+Unsurprisingly, half of the students are younger people, middle aged
 adults have kids under 18. Few business owners.
 
 ![](demographics_files/figure-gfm/person_type-1.png)<!-- -->

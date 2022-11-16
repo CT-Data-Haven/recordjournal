@@ -19,10 +19,10 @@ are many, many write-ins here that I will share separately.
 
 ![](news_habits_2_files/figure-gfm/top_total-1.png)<!-- -->
 
-I’m really surprised no young people selected environment/climate
-change. Music/arts/culture, sports, and technology top the list for
-young people. Health, education, and music/arts/culture for the other
-two groups.
+I’m really surprised such a small share of young people selected
+environment/climate change. Music/arts/culture, education, and sports
+top the list for young people. Health, education, and music/arts/culture
+for the other two groups.
 
 ![](news_habits_2_files/figure-gfm/top_age-1.png)<!-- -->
 
@@ -33,7 +33,7 @@ interesting.
 
 Looks like people who speak English at home also have an interest in
 local events, otherwise health, education, and music top the lists
-still.
+still, but Spanish-speakers also like to read about sports.
 
 ![](news_habits_2_files/figure-gfm/top_language-1.png)<!-- -->
 

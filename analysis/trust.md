@@ -9,11 +9,11 @@ that’s related to whether or not they even use those sources.
 
 ![](trust_files/figure-gfm/age_trust-1.png)<!-- -->
 
-Latinos trust social media news at about twice the rate of non-Latinos.
-Again local news tops the list, but Latinos also trust national news
-sources (Telemundo, etc.) at a higher rate than non-Latinos. Again, like
-social media among older people, I wonder if it’s that non-Latinos tend
-to prefer local news.
+Latinos trust social media news at more than twice the rate of
+non-Latinos. Again local news tops the list, but Latinos also trust
+national news sources (Telemundo, etc.) at a higher rate than
+non-Latinos. Again, like social media among older people, I wonder if
+it’s that non-Latinos tend to prefer local news.
 
 ![](trust_files/figure-gfm/latino_trust-1.png)<!-- -->
 
@@ -25,10 +25,11 @@ generally distrust social media more.
 
 ## Beliefs
 
-For younger and older adults, majorities believe the news covers
-important topics and they trust the sources of news they get, but
-there’s a lot of ambivalence about whether news reflects their values,
-although a plurality of older adults agree with that.
+Most older adults believe the news covers important topics and they
+trust the sources of news they get, but there’s a lot of ambivalence
+about whether news reflects their values, although a plurality of older
+adults agree with that. We see this in our DCWS survey data, too… older
+adults just think more stuff is relevant to them.
 
 ![](trust_files/figure-gfm/beliefs_age-1.png)<!-- -->
 
