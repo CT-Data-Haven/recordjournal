@@ -2,7 +2,7 @@ library(tidyverse)
 library(cwi)
 library(janitor)
 library(camiller)
-source("analysis/look_up_tibbles.R")
+source("survey_data/look_up_tibbles.R")
 
 path <- "survey_data/11082022/"
 plot_path <- "/distro/"
