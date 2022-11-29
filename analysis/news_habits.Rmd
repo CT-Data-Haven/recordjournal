@@ -158,6 +158,31 @@ pobmode1 %>%
   theme(axis.text.x = element_blank())
 ```
 
+```{r mode_pob_latino}
+pobmodelatino <- read %>% 
+  select(formats_used, latino_by_pob) %>% 
+  filter(!is.na(formats_used), !is.na(latino_by_pob)) %>% 
+  group_by(formats_used, latino_by_pob) %>% 
+  count() %>% 
+  mutate(formats_used = if_else(n <=2, "Other", formats_used)) %>% 
+  filter(formats_used != "Other") %>% 
+  group_by(formats_used, latino_by_pob) %>% 
+  summarise(n = sum(n)) %>% 
+  ungroup() %>% 
+  rename(format = formats_used) %>% 
+  mutate(mode = "used")
+
+pobmodelatino %>% 
+  filter(latino_by_pob != "Not Latino") %>% 
+  ggplot(aes(x = n, y = reorder(format, n))) +
+  geom_col() +
+  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
+  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
+  facet_grid(cols = vars(latino_by_pob)) +
+  labs(title = "How Latino respondents get news, by place of birth", subtitle = "Respondents could select multiple ways", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank())
+```
+
 ## Preferred language by age and ethnicity
 
 People under 50 have a slightly stronger overall preference for bilingual content.
@@ -204,6 +229,26 @@ pref_latino %>%
   theme(axis.text.x = element_blank())
 ```
 
+```{r pref_latino_pob}
+pref_latinopob <- read %>% 
+  select(latino_by_pob, tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(latino_by_pob), !is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(latino_by_pob, format, language) %>% 
+  count()
+
+pref_latinopob %>% 
+  filter(!language %in% c("I don't use this format", "Other"), latino_by_pob != "Not Latino") %>% 
+  ggplot(aes(x = n, y = reorder(format, n))) +
+  geom_col() +
+  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
+  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
+  facet_grid(cols = vars(latino_by_pob), rows = vars(language)) +
+  labs(title = "Preferred language by mode for Latinos, by place of birth", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank())
+```
+
 ## News sources
 
 Preferred sources is also an open text field. Mining for word clouds...
@@ -219,6 +264,9 @@ spn_at_home <- read %>% filter(language == "Spanish")
 eng_at_home <- read %>% filter(language == "English")
 both_at_home <- read %>% filter(language == "Both English and Spanish")
 
+fblatino <- read %>% filter(latino_by_pob == "Foreign-born Latino")
+uslatino <- read %>% filter(latino_by_pob == "US-born Latino")
+
 list_age00_29 <- str_split(age00_29$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
 list_age30_49 <- str_split(age30_49$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
 list_age50_99 <- str_split(age50_99$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
@@ -228,6 +276,10 @@ list_latino <- str_split(latino$open_text_media, ",| y | and | or|\\/|  ", simpl
 list_spn_at_home <- str_split(spn_at_home$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
 list_eng_at_home <- str_split(eng_at_home$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
 list_both_at_home <- str_split(both_at_home$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
+
+list_fblatino <- str_split(fblatino$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
+
+list_uslatino <- str_split(uslatino$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
 
 clean_clouds <- function(x){
  x %>% 
@@ -243,6 +295,8 @@ d <- tibble(source = c(list_latino)) %>% clean_clouds()
 e <- tibble(source = c(list_spn_at_home)) %>% clean_clouds()
 f <- tibble(source = c(list_eng_at_home)) %>% clean_clouds()
 g <- tibble(source = c(list_both_at_home)) %>% clean_clouds()
+h <- tibble(source = c(list_fblatino)) %>% clean_clouds()
+i <- tibble(source = c(list_uslatino)) %>% clean_clouds()
 
 cloud_a <- a %>% group_by(source) %>% count()
 cloud_b <- b %>% group_by(source) %>% count()
@@ -251,6 +305,8 @@ cloud_d <- d %>% group_by(source) %>% count()
 cloud_e <- e %>% group_by(source) %>% count()
 cloud_f <- f %>% group_by(source) %>% count()
 cloud_g <- g %>% group_by(source) %>% count()
+cloud_h <- h %>% group_by(source) %>% count()
+cloud_i <- i %>% group_by(source) %>% count()
 ```
 
 By age, young people put fewer answers in, older people put a lot more
@@ -316,4 +372,22 @@ ggplot(cloud_g, aes(label = source, size = n+3, color = n)) +
   theme_minimal() +
   scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
   labs(title = "Sources preferred by bilingual people at home")
+```
+
+Foreign-born Latinos use Facebook more (more access to news sources from abroad?)
+
+```{r clouds_latinopob}
+ggplot(cloud_h, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by Foreign-born Latinos")
+
+ggplot(cloud_i, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by US-born Latinos")
 ```

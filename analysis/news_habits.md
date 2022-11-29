@@ -23,6 +23,8 @@ are really it.
 
 ![](news_habits_files/figure-gfm/mode_place_of_birth-1.png)<!-- -->
 
+![](news_habits_files/figure-gfm/mode_pob_latino-1.png)<!-- -->
+
 ## Preferred language by age and ethnicity
 
 People under 50 have a slightly stronger overall preference for
@@ -35,6 +37,8 @@ people who identify as Latino strongly preferring Spanish and bilingual
 content.
 
 ![](news_habits_files/figure-gfm/pref_ethnicity-1.png)<!-- -->
+
+![](news_habits_files/figure-gfm/pref_latino_pob-1.png)<!-- -->
 
 ## News sources
 
@@ -51,3 +55,8 @@ Telemundo far and away the favored source for Latinos
 Facebook stands out among Spanish speakers
 
 ![](news_habits_files/figure-gfm/clouds_language-1.png)<!-- -->![](news_habits_files/figure-gfm/clouds_language-2.png)<!-- -->![](news_habits_files/figure-gfm/clouds_language-3.png)<!-- -->
+
+Foreign-born Latinos use Facebook more (more access to news sources from
+abroad?)
+
+![](news_habits_files/figure-gfm/clouds_latinopob-1.png)<!-- -->![](news_habits_files/figure-gfm/clouds_latinopob-2.png)<!-- -->

@@ -119,6 +119,12 @@ top_language <- read %>%
   mutate(category = "language") %>% 
   separate_rows(topic, sep = ";")
 
+top_poblatino <- read %>%
+  filter(!is.na(latino_by_pob), !is.na(topics_of_interest)) %>%
+  select(group = latino_by_pob, topic = topics_of_interest) %>% 
+  mutate(category = "latino_by_pob") %>% 
+  separate_rows(topic, sep = ";")
+
 top_total <- read %>%
   filter(!is.na(topics_of_interest)) %>%
   select(topic = topics_of_interest) %>% 
@@ -131,14 +137,14 @@ denoms_tops <- read %>%
   group_by(category, group, topic) %>% 
   count()  %>% 
   bind_rows(read %>% 
-  select(age, latino, language) %>% 
+  select(age, latino, language, latino_by_pob) %>% 
   pivot_longer(cols = everything(), names_to = "category", values_to = "group") %>% 
   group_by(category, group) %>% 
   count() %>% 
   filter(!is.na(group), group != "Opt out") %>% 
   mutate(topic = "total"))
 
-topics <- bind_rows(top_age, top_latino, top_language, top_total) %>% 
+topics <- bind_rows(top_age, top_latino, top_language, top_poblatino, top_total) %>% 
   select(category, group, everything()) %>%  
   filter(topic != "", !topic == "None") %>% 
   mutate(topic = if_else(grepl("arte|Music", topic), "Music, arts, and culture", topic),
@@ -224,6 +230,19 @@ topics %>%
   labs(title = "Topics of interest (by language spoken at home)", x = NULL, y = NULL)
 ```
 
+Same general trends with sports ranking a bit higher among foreign-born Latinos.
+
+```{r top_latinopob}
+topics %>% 
+  filter(!is.na(share), category == "latino_by_pob", group != "Not Latino") %>% 
+  ggplot(aes(x = share, y = reorder(topic, share))) +
+  geom_col(width = .8) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
+  facet_grid(cols = vars(group)) +
+  theme(axis.text.x = element_blank()) +
+  labs(title = "Topics of interest (for Latinos by place of birth)", x = NULL, y = NULL)
+```
+
 ## Special topics
 
 No surprises in the ages 30-49 group wanting stories about families with kids/youth and respondents ages 50+ wanting stories about seniors.
@@ -247,6 +266,12 @@ spec_language <- read %>%
   mutate(category = "language") %>% 
   separate_rows(story, sep = ";")
 
+spec_latinopob <- read %>%
+  filter(!is.na(latino_by_pob), !is.na(special_stories)) %>%
+  select(group = latino_by_pob, story = special_stories) %>% 
+  mutate(category = "latino_by_pob") %>% 
+  separate_rows(story, sep = ";")
+
 spec_total <- read %>%
   filter(!is.na(special_stories)) %>%
   select(story = special_stories) %>% 
@@ -259,14 +284,14 @@ denoms_spec <- read %>%
   group_by(category, group, story) %>% 
   count()  %>% 
   bind_rows(read %>% 
-  select(age, latino, language) %>% 
+  select(age, latino, language, latino_by_pob) %>% 
   pivot_longer(cols = everything(), names_to = "category", values_to = "group") %>% 
   group_by(category, group) %>% 
   count() %>% 
   filter(!is.na(group), group != "Opt out") %>% 
   mutate(story = "total"))
 
-spec <- bind_rows(spec_age, spec_latino, spec_language, spec_total) %>% 
+spec <- bind_rows(spec_age, spec_latino, spec_language, spec_latinopob, spec_total) %>% 
   select(category, group, everything()) %>% 
   mutate(story = str_remove(story, "Topics related to "),
          story = str_remove(story, "Temas acerca de ")) %>% 
@@ -287,11 +312,11 @@ spec <- bind_rows(spec_age, spec_latino, spec_language, spec_total) %>%
   group_by(category, group) %>% 
   calc_shares(group = story, denom = "total", value = n) %>% 
   mutate(category = as.factor(category) %>%
-           fct_relevel(., "total", "age", "language", "latino"),
+           fct_relevel(., "total", "age", "language", "latino", "latino_by_pob"),
          group = as.factor(group))
 
 spec %>% 
-  filter(!is.na(share)) %>% 
+  filter(!is.na(share), group != "Not Latino") %>% 
   mutate(story = str_wrap(story, 12)) %>% 
   ggplot(aes(x = share, y = fct_rev(group))) +
   geom_col(width = .8) +

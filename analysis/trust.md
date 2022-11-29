@@ -23,6 +23,10 @@ generally distrust social media more.
 
 ![](trust_files/figure-gfm/lang_trust-1.png)<!-- -->
 
+Pretty similar between foreign-born and US-born Latinos.
+
+![](trust_files/figure-gfm/latinopob_trust-1.png)<!-- -->
+
 ## Beliefs
 
 Most older adults believe the news covers important topics and they
@@ -43,3 +47,7 @@ news reflects their beliefs. I wonder if this is influenced by the fact
 people are answering this survey for their local paper.
 
 ![](trust_files/figure-gfm/beliefs_lang-1.png)<!-- -->
+
+Again, pretty similar here.
+
+![](trust_files/figure-gfm/beliefs_latinopob-1.png)<!-- -->

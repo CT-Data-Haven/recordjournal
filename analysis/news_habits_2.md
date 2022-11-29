@@ -37,6 +37,11 @@ still, but Spanish-speakers also like to read about sports.
 
 ![](news_habits_2_files/figure-gfm/top_language-1.png)<!-- -->
 
+Same general trends with sports ranking a bit higher among foreign-born
+Latinos.
+
+![](news_habits_2_files/figure-gfm/top_latinopob-1.png)<!-- -->
+
 ## Special topics
 
 No surprises in the ages 30-49 group wanting stories about families with
