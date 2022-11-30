@@ -45,6 +45,12 @@ geo_language <- read %>%
   mutate(category = "language") %>% 
   separate_rows(region, sep = ";")
 
+geo_latinopob <- read %>%
+  filter(!is.na(latino_by_pob), !is.na(regions_of_interest)) %>%
+  select(group = latino_by_pob, region = regions_of_interest) %>% 
+  mutate(category = "latino_by_pob") %>% 
+  separate_rows(region, sep = ";")
+
 geo_total <- read %>%
   filter(!is.na(regions_of_interest)) %>%
   select(region = regions_of_interest) %>% 
@@ -57,14 +63,14 @@ denoms_geos <- read %>%
   group_by(category, group, region) %>% 
   count()  %>% 
   bind_rows(read %>% 
-  select(age, latino, language) %>% 
+  select(age, latino, language, latino_by_pob) %>% 
   pivot_longer(cols = everything(), names_to = "category", values_to = "group") %>% 
   group_by(category, group) %>% 
   count() %>% 
   filter(!is.na(group), group != "Opt out") %>% 
   mutate(region = "total"))
 
-geos <- bind_rows(geo_age, geo_latino, geo_language, geo_total) %>% 
+geos <- bind_rows(geo_age, geo_latino, geo_language, geo_latinopob, geo_total) %>% 
   select(category, group, everything()) %>%  
   filter(region != "None") %>% 
   mutate(region = if_else(region == "Estatal", "State", region),
@@ -80,13 +86,13 @@ geos <- bind_rows(geo_age, geo_latino, geo_language, geo_total) %>%
   group_by(category, group) %>% 
   calc_shares(group = region, denom = "total", value = n) %>% 
   mutate(category = as.factor(category) %>%
-           fct_relevel(., "total", "age", "language", "latino"),
+           fct_relevel(., "total", "age", "language", "latino", "latino_by_pob"),
          group = as.factor(group),
          region = as.factor(region) %>%
            fct_relevel(., "Local", "State", "Regional", "National", "International"))
 
 geos %>% 
-  filter(!is.na(share)) %>% 
+  filter(!is.na(share), group != "Not Latino") %>% 
   ggplot(aes(x = share, y = fct_rev(group))) +
   geom_col(width = .8) +
   geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
