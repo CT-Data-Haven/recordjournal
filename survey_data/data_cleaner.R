@@ -4,7 +4,7 @@ library(janitor)
 library(camiller)
 source("survey_data/look_up_tibbles.R")
 
-path <- "survey_data/11082022/"
+path <- "survey_data/12272022/"
 plot_path <- "/distro/"
 
 read_english <- read_csv(paste(path, "(English) RJ Latino Communities Reporting Lab Survey.csv", sep = "")) %>%

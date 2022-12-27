@@ -16,7 +16,7 @@ source("../utils/plot_utils.R")
 ```
 
 ```{r paths}
-path <- "../survey_data/11082022/"
+path <- "../survey_data/12272022/"
 plot_path <- "../distro/"
 read <- read_csv(paste(path, "clean.csv"))
 ```
@@ -71,7 +71,7 @@ read %>%
   count() %>% 
   arrange(desc(n)) %>% 
   ungroup() %>% 
-  mutate(share = n / 1612) %>% 
+  mutate(share = n / 2033) %>% 
   mutate(share = scales::percent(share, accuracy = 1)) %>% 
   knitr::kable()
 
@@ -159,7 +159,7 @@ read %>% select(place_of_birth) %>%
   group_by(place_of_birth) %>% 
   count() %>% 
   ungroup() %>% 
-  mutate(share = n / 1631) %>% 
+  mutate(share = n / 2033) %>% 
   mutate(share = scales::percent(share, accuracy = 1)) %>% 
   knitr::kable()
 
@@ -210,7 +210,7 @@ read %>%
   filter(!is.na(language)) %>%
   group_by(language) %>% 
   count() %>% 
-  mutate(share = n / 1573) %>% 
+  mutate(share = n / 1961) %>% 
   mutate(share = scales::percent(share, accuracy = 1)) %>% 
   knitr::kable()
 
@@ -290,7 +290,7 @@ voter %>%
   geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
   geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
   scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow")])) +
-  labs(title = "Share of respondents who are registered to vote", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts n < 10") +
+  labs(title = "Share of respondents who are registered to vote", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts") +
   theme(axis.text.y = element_blank(),
         legend.position = "bottom")
   
@@ -316,8 +316,8 @@ person_type %>%
   filter(!is.na(share), !is.na(age), !is.na(gender), !gender %in% c("Transgender & NB", "Opt out"), person_type != "None of these") %>% 
   ggplot(aes(x = share, y = age, group = gender)) +
   geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
-  geom_text(data = . %>% filter(share >= .21), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = 1.2) +
-  geom_text(data = . %>% filter(share < .21), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = -.2, color = "black") +
+  geom_text(data = . %>% filter(share >= .11), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = 1.2) +
+  geom_text(data = . %>% filter(share < .11), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = -.2, color = "black") +
   facet_grid(cols = vars(person_type)) +
   scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow")])) +
   labs(title = "Share of respondents by person type and gender", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts n < 10") +

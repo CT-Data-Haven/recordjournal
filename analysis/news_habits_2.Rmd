@@ -16,7 +16,7 @@ library(camiller)
 
 ```{r paths}
 source("../utils/plot_utils.R")
-path <- "../survey_data/11082022/"
+path <- "../survey_data/12272022/"
 plot_path <- "../distro/"
 read <- read_csv(paste(path, "clean.csv")) %>% 
   rename(age = big_age_band)
