@@ -5,10 +5,13 @@ Quick population summary
 library(tidyverse)
 library(tidycensus)
 library(cwi)
-source("../utils/plot_utils.R")
+source("../../utils/plot_utils.R")
 ```
 
 ``` r
+fetch_fb <- multi_geo_acs(table = "B05003", year = 2020, counties = NULL, towns = c("Meriden", "Wallingford")) %>%
+  label_acs()
+
 fetch_latino <- multi_geo_acs(table = "B01001I", year = 2020, counties = NULL, towns = c("Meriden", "Wallingford")) %>%
   label_acs() %>%
   mutate(race = "latino") %>% 
@@ -53,3 +56,24 @@ race_age %>%
 ```
 
 ![](population_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+
+``` r
+fb <- fetch_fb %>% 
+  separate(label, into = c("v1", "v2", "v3", "v4", "v5"), fill = "right", sep = "!!") %>%
+  filter(!is.na(v3), is.na(v5)) %>% 
+  mutate(v4 = if_else(is.na(v4), "Total", v4)) %>% 
+  group_by(year, level, name, v3, v4) %>% 
+  summarise(estimate = sum(estimate),
+            moe = moe_sum(moe = moe, estimate = estimate)) %>% 
+  ungroup() %>% 
+  group_by(year, level, name, v3) %>% 
+  camiller::calc_shares(group = v4, denom = "Total", value = estimate, moe = moe)
+
+fb %>% 
+  ggplot(aes(x = name, y = share, group = name)) +
+  geom_col(aes(fill = v4), position = position_stack(.5)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
+  facet_grid(~v3)
+```
+
+![](population_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
