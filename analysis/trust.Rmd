@@ -16,9 +16,9 @@ source("../utils/plot_utils.R")
 ```
 
 ```{r paths}
-path <- "../survey_data/12272022/"
+path <- "../survey_data/01032023/"
 plot_path <- "../distro/"
-read <- read_csv(paste(path, "clean.csv")) %>% 
+read <- read_csv(paste(path, "clean.csv", sep = "")) %>% 
   rename(age = big_age_band)
 ```
 

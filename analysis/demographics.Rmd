@@ -16,12 +16,12 @@ source("../utils/plot_utils.R")
 ```
 
 ```{r paths}
-path <- "../survey_data/12272022/"
+path <- "../survey_data/01032023/"
 plot_path <- "../distro/"
-read <- read_csv(paste(path, "clean.csv"))
+read <- read_csv(paste(path, "clean.csv", sep = ""))
 ```
 
-Current number of respondents (blanks removed) as of November 8, 2022.
+Current number of respondents (blanks removed) as of January 3, 2023.
 
 ```{r count}
 read %>% 
@@ -60,8 +60,6 @@ This time around, I'll group ages into 0-29, 30-49, and 50+
 
 Across all age groups, more women than men responding, with greatest disparity in 30-49 range. Keep that in mind as we look at these age-based breakdowns later.
 
-**Also we are now HEAVILY skewed towards middle-aged women**
-
 ```{r gender}
 #read %>% select(gender) %>% filter(!is.na(gender)) %>% count()
 
@@ -71,7 +69,7 @@ read %>%
   count() %>% 
   arrange(desc(n)) %>% 
   ungroup() %>% 
-  mutate(share = n / 2033) %>% 
+  mutate(share = n / 2043) %>% 
   mutate(share = scales::percent(share, accuracy = 1)) %>% 
   knitr::kable()
 
@@ -138,7 +136,7 @@ ethnicity %>%
   geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
   geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
   scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow")])) +
-  labs(title = "Share of respondents who identify as Latino/Latina/Latinx", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts n < 10") +
+  labs(title = "Share of respondents who identify as Latino/Latina/Latinx", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts") +
   theme(axis.text.y = element_blank(),
         legend.position = "bottom")
 ```
@@ -159,7 +157,7 @@ read %>% select(place_of_birth) %>%
   group_by(place_of_birth) %>% 
   count() %>% 
   ungroup() %>% 
-  mutate(share = n / 2033) %>% 
+  mutate(share = n / 2043) %>% 
   mutate(share = scales::percent(share, accuracy = 1)) %>% 
   knitr::kable()
 
@@ -320,7 +318,7 @@ person_type %>%
   geom_text(data = . %>% filter(share < .11), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = -.2, color = "black") +
   facet_grid(cols = vars(person_type)) +
   scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow")])) +
-  labs(title = "Share of respondents by person type and gender", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts n < 10") +
+  labs(title = "Share of respondents by person type and gender", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts") +
   theme(axis.text.x = element_blank(),
         legend.position = "bottom")
 ```

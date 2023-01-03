@@ -1,13 +1,13 @@
 Respondent demographics
 ================
 
-Current number of respondents (blanks removed) as of November 8, 2022.
+Current number of respondents (blanks removed) as of January 3, 2023.
 
 | survey  |    n |
 |:--------|-----:|
-| English |  863 |
-| Spanish | 1170 |
-| Total   | 2033 |
+| English |  867 |
+| Spanish | 1176 |
+| Total   | 2043 |
 
 **I’m going to stop disaggregating by survey type so we can focus on
 disaggregating by other metrics, like age, gender, or nationality**
@@ -24,12 +24,10 @@ Across all age groups, more women than men responding, with greatest
 disparity in 30-49 range. Keep that in mind as we look at these
 age-based breakdowns later.
 
-**Also we are now HEAVILY skewed towards middle-aged women**
-
 | gender           |    n | share |
 |:-----------------|-----:|:------|
-| Woman            | 1145 | 56%   |
-| Man              |  840 | 41%   |
+| Woman            | 1153 | 56%   |
+| Man              |  842 | 41%   |
 | NA               |   26 | 1%    |
 | Opt out          |   11 | 1%    |
 | Transgender & NB |   11 | 1%    |
@@ -55,12 +53,12 @@ surprised at the diversity in the 30-49 crowd.
 
 | place_of_birth     |   n | share |
 |:-------------------|----:|:------|
-| DOMINICAN REPUBLIC |  75 | 4%    |
-| ECUADOR            | 202 | 10%   |
-| MEXICO             | 271 | 13%   |
+| DOMINICAN REPUBLIC |  76 | 4%    |
+| ECUADOR            | 203 | 10%   |
+| MEXICO             | 272 | 13%   |
 | OTHER              | 381 | 19%   |
-| PUERTO RICO        | 476 | 23%   |
-| USA                | 628 | 31%   |
+| PUERTO RICO        | 482 | 24%   |
+| USA                | 629 | 31%   |
 
 ![](demographics_files/figure-gfm/pob-1.png)<!-- -->
 
@@ -70,9 +68,9 @@ Pretty even language split among older adults.
 
 | language                 |   n | share |
 |:-------------------------|----:|:------|
-| Both English and Spanish | 900 | 46%   |
-| English                  | 439 | 22%   |
-| Spanish                  | 622 | 32%   |
+| Both English and Spanish | 906 | 46%   |
+| English                  | 441 | 22%   |
+| Spanish                  | 624 | 32%   |
 
 ![](demographics_files/figure-gfm/lang_at_home-1.png)<!-- -->
 
