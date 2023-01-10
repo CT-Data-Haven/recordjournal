@@ -3,6 +3,8 @@ Trust in news media
 
 ## Trustworthiness by source by group
 
+![](trust_files/figure-gfm/trust_total-1.png)<!-- -->
+
 Local news tops the trustworthiness list among all age groups. Older
 adults are more skeptical of social media/social circles. I wonder if
 that’s related to whether or not they even use those sources.
@@ -28,6 +30,8 @@ Pretty similar between foreign-born and US-born Latinos.
 ![](trust_files/figure-gfm/latinopob_trust-1.png)<!-- -->
 
 ## Beliefs
+
+![](trust_files/figure-gfm/beliefs_total-1.png)<!-- -->
 
 Most older adults believe the news covers important topics and they
 trust the sources of news they get, but there’s a lot of ambivalence

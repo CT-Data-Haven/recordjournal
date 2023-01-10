@@ -60,3 +60,7 @@ Foreign-born Latinos use Facebook more (more access to news sources from
 abroad?)
 
 ![](news_habits_files/figure-gfm/clouds_latinopob-1.png)<!-- -->![](news_habits_files/figure-gfm/clouds_latinopob-2.png)<!-- -->
+
+Total for good measure
+
+![](news_habits_files/figure-gfm/clouds_total-1.png)<!-- -->

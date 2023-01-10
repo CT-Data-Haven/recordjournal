@@ -281,6 +281,8 @@ list_fblatino <- str_split(fblatino$open_text_media, ",| y | and | or|\\/|  ", s
 
 list_uslatino <- str_split(uslatino$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
 
+list_total <- str_split(read$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
+
 clean_clouds <- function(x){
  x %>% 
     filter(!is.na(source), source != "") %>% 
@@ -297,6 +299,7 @@ f <- tibble(source = c(list_eng_at_home)) %>% clean_clouds()
 g <- tibble(source = c(list_both_at_home)) %>% clean_clouds()
 h <- tibble(source = c(list_fblatino)) %>% clean_clouds()
 i <- tibble(source = c(list_uslatino)) %>% clean_clouds()
+j <- tibble(source = c(list_total)) %>% clean_clouds()
 
 cloud_a <- a %>% group_by(source) %>% count()
 cloud_b <- b %>% group_by(source) %>% count()
@@ -307,6 +310,7 @@ cloud_f <- f %>% group_by(source) %>% count()
 cloud_g <- g %>% group_by(source) %>% count()
 cloud_h <- h %>% group_by(source) %>% count()
 cloud_i <- i %>% group_by(source) %>% count()
+cloud_j <- j %>% group_by(source) %>% count()
 ```
 
 By age, young people put fewer answers in, older people put a lot more
@@ -390,4 +394,15 @@ ggplot(cloud_i, aes(label = source, size = n+3, color = n)) +
   theme_minimal() +
   scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
   labs(title = "Sources preferred by US-born Latinos")
+```
+
+Total for good measure
+
+```{r clouds_total}
+ggplot(cloud_j, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  labs(title = "Sources preferred by all respondents")
 ```
