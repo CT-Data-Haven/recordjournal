@@ -21,35 +21,49 @@ path <- "../survey_data/01032023/"
 plot_path <- "../distro/"
 read <- read_csv(paste(path, "clean.csv", sep = "")) %>% 
   rename(age = big_age_band)
+
+age_labels <- tibble(age = c("age00_29", "age30_49", "age50_99", "Total"),
+                     label = c("Under 30", "30-49", "50 and over", "Total")) %>% 
+  mutate(label = as.factor(label) %>% 
+           fct_relevel(., "Total", "Under 30", "30-49", "50 and over"))
 ```
 
 ## Media used vs. Media preferred by total, age, and language at home
 
 Overall totals not surprising. Strong preference for TV and social media. I think we can just look at "used."
 
-```{r modes_used_preferred_total}
-modes_a <- read %>% 
+```{r modes_used_preferred_total, fig.height=3.5}
+prefread <- read %>% 
+  mutate(formats_used = as.factor(formats_used),
+         formats_used = fct_collapse(formats_used, TV = "TV", `Social media and friends` = c("Social media", "Social circles"),
+                                     `Newspapers and apps` = c("Newspapers", "News apps/news websites"),
+                                      `Radio or podcast` = c("Radio", "Podcast"),
+                                     `Other sources` = c("Email/newsletter", "Text message"))) %>% 
+  mutate(formats_preferred = as.factor(formats_preferred),
+         formats_preferred = fct_collapse(formats_preferred, TV = "TV", `Social media and friends` = c("Social media", "Social circles"),
+                                     `Newspapers and apps` = c("Newspapers", "News apps/news websites"),
+                                     `Radio or podcast` = c("Radio", "Podcast"),
+                                     `Other sources` = c("Email/newsletter", "Text message")))
+modes_a <- prefread %>% 
   select(formats_used) %>% 
   filter(!is.na(formats_used)) %>% 
   group_by(formats_used) %>% 
   count() %>% 
-  ungroup() %>% 
-  mutate(formats_used = if_else(n <=2, "Other", formats_used)) %>% 
-  filter(formats_used != "Other") %>% 
+  ungroup() %>%
+  filter(n >= 3) %>% 
   group_by(formats_used) %>% 
   summarise(n = sum(n)) %>% 
   adorn_totals() %>% 
   rename(format = formats_used) %>% 
   mutate(mode = "Used")
 
-modes_b <- read %>% 
+modes_b <- prefread %>% 
   select(formats_preferred) %>% 
   filter(!is.na(formats_preferred)) %>% 
   group_by(formats_preferred) %>% 
   count() %>% 
-  ungroup() %>% 
-  mutate(formats_preferred = if_else(n <=2, "Other", formats_preferred)) %>% 
-  filter(formats_preferred != "Other") %>% 
+  ungroup() %>%
+  filter(n >= 3) %>%
   group_by(formats_preferred) %>% 
   summarise(n = sum(n)) %>% 
   adorn_totals() %>% 
@@ -75,68 +89,78 @@ mode_bind %>%
         legend.position = "none")
 ```
 
-I expected to see social media top the list for younger people. Social media just ekeing out ahead of TV for 30-49 year olds is interesting. We Milennials love a platform.
+I expected to see social media top the list for younger people. Social media just ekeing out ahead of TV for 30-49 year olds is interesting. We Millennials love a platform.
 
 ```{r modes_age}
-agemode1 <- read %>% 
+agemode_denom <- prefread %>% 
+  filter(latino == "Yes") %>% 
+  select(formats_used, age) %>% 
+  filter(!is.na(formats_used), !is.na(age)) %>% 
+  group_by(age) %>% 
+  count() %>% 
+  mutate(format = "Total")
+  
+agemode1 <- prefread %>% 
+  filter(latino == "Yes") %>% 
   select(formats_used, age) %>% 
   filter(!is.na(formats_used), !is.na(age)) %>% 
   group_by(formats_used, age) %>% 
   count() %>% 
-  mutate(formats_used = if_else(n <=2, "Other", formats_used)) %>% 
-  filter(formats_used != "Other") %>% 
+  ungroup() %>% 
+  filter(n >= 3) %>% 
   group_by(formats_used, age) %>% 
   summarise(n = sum(n)) %>% 
   ungroup() %>% 
   rename(format = formats_used) %>% 
-  mutate(mode = "used")
-# 
-# agemode2 <- read %>% 
-#   select(formats_preferred, age) %>% 
-#   filter(!is.na(formats_preferred), !is.na(age)) %>% 
-#   group_by(formats_preferred, age) %>% 
-#   count() %>% 
-#   mutate(formats_preferred = if_else(n <=2, "Other", formats_preferred)) %>% 
-#   filter(formats_preferred != "Other") %>% 
-#   group_by(formats_preferred, age) %>% 
-#   summarise(n = sum(n)) %>% 
-#   ungroup() %>% 
-#   rename(format = formats_preferred) %>% 
-#   mutate(mode = "preferred")
-# 
-# agemode_bind <- bind_rows(agemode1, agemode2)
+  bind_rows(agemode_denom) %>% 
+  ungroup() %>% 
+  group_by(age) %>% 
+  calc_shares(group = format, denom = "Total", value = n)
 
 agemode1 %>% 
-  ggplot(aes(x = n, y = reorder(format, n))) +
+  left_join(age_labels, by = "age") %>% 
+  filter(format != "Total") %>% 
+  ggplot(aes(x = share, y = reorder(format, share))) +
   geom_col() +
-  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
-  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
-  facet_grid(cols = vars(age)) +
+  geom_text(data = . %>% filter(share >= .15), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
+  geom_text(data = . %>% filter(share < .15), aes(label = scales::percent(share, accuracy = 1)), hjust = -.2) +
+  facet_grid(cols = vars(label)) +
   labs(title = "How respondents get news, by age", subtitle = "Respondents could select multiple ways", x = NULL, y = NULL) +
   theme(axis.text.x = element_blank())
 ```
 
-I didn't expect these to be so similar.
-
 ```{r mode_lang}
-langmode1 <- read %>% 
+langmode_denom <- prefread %>% 
+  filter(latino == "Yes") %>% 
+  select(formats_used, language) %>% 
+  filter(!is.na(formats_used), !is.na(language)) %>% 
+  group_by(language) %>% 
+  count() %>% 
+  mutate(format = "Total")
+  
+langmode1 <- prefread %>% 
+  filter(latino == "Yes") %>% 
   select(formats_used, language) %>% 
   filter(!is.na(formats_used), !is.na(language)) %>% 
   group_by(formats_used, language) %>% 
   count() %>% 
-  mutate(formats_used = if_else(n <=2, "Other", formats_used)) %>% 
-  filter(formats_used != "Other") %>% 
+  ungroup() %>% 
+  filter(n >= 3) %>% 
   group_by(formats_used, language) %>% 
   summarise(n = sum(n)) %>% 
   ungroup() %>% 
   rename(format = formats_used) %>% 
-  mutate(mode = "used")
+  bind_rows(langmode_denom) %>% 
+  ungroup() %>% 
+  group_by(language) %>% 
+  calc_shares(group = format, denom = "Total", value = n)
 
 langmode1 %>% 
-  ggplot(aes(x = n, y = reorder(format, n))) +
+  filter(format != "Total") %>% 
+  ggplot(aes(x = share, y = reorder(format, share))) +
   geom_col() +
-  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
-  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
+  geom_text(data = . %>% filter(share >= .1), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
+  geom_text(data = . %>% filter(share < .1), aes(label = scales::percent(share, accuracy = 1)), hjust = -.2) +
   facet_grid(cols = vars(language)) +
   labs(title = "How respondents get news, by language spoken at home", subtitle = "Respondents could select multiple ways", x = NULL, y = NULL) +
   theme(axis.text.x = element_blank())
@@ -144,58 +168,79 @@ langmode1 %>%
 
 Huh, I expected more variation here, too. I guess TV and social media are really it.
 
-```{r mode_place_of_birth}
-pobmode1 <- read %>% 
-  select(formats_used, place_of_birth) %>% 
-  filter(!is.na(formats_used), !is.na(place_of_birth)) %>% 
-  group_by(formats_used, place_of_birth) %>% 
+```{r mode_gender}
+gender_denom <- prefread %>% 
+  select(gender, formats_used) %>% 
+  filter(!is.na(formats_used), !is.na(gender)) %>% 
+  group_by(gender) %>% 
   count() %>% 
-  mutate(formats_used = if_else(n <=2, "Other", formats_used)) %>% 
-  filter(formats_used != "Other") %>% 
-  group_by(formats_used, place_of_birth) %>% 
+  mutate(format = "Total")
+
+gendermode1 <- prefread %>% 
+  filter(latino == "Yes") %>% 
+  select(formats_used, gender) %>% 
+  filter(!is.na(formats_used), !is.na(gender)) %>% 
+  group_by(formats_used, gender) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(n >= 3) %>% 
+  group_by(formats_used, gender) %>% 
   summarise(n = sum(n)) %>% 
   ungroup() %>% 
   rename(format = formats_used) %>% 
-  mutate(mode = "used")
+  bind_rows(gender_denom) %>% 
+  ungroup() %>% 
+  group_by(gender) %>% 
+  calc_shares(group = format, denom = "Total", value = n)
 
-pobmode1 %>% 
-  ggplot(aes(x = n, y = reorder(format, n))) +
+gendermode1 %>% 
+  filter(format != "Total", gender != "Transgender & NB") %>% 
+  ggplot(aes(x = share, y = reorder(format, share))) +
   geom_col() +
-  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
-  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
-  facet_grid(cols = vars(place_of_birth)) +
-  labs(title = "How respondents get news, by place of birth", subtitle = "Respondents could select multiple ways", x = NULL, y = NULL) +
+  geom_text(data = . %>% filter(share >= .15), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
+  geom_text(data = . %>% filter(share < .15), aes(label = scales::percent(share, accuracy = 1)), hjust = -.2) +
+  facet_grid(cols = vars(gender)) +
+  labs(title = "How respondents get news, by gender", subtitle = "Respondents could select multiple ways", x = NULL, y = NULL) +
   theme(axis.text.x = element_blank())
 ```
 
 ```{r mode_pob_latino}
-pobmodelatino <- read %>% 
+pobmodedenom <- prefread %>% 
+  select(latino_by_pob, formats_used) %>% 
+  filter(!is.na(formats_used), !is.na(latino_by_pob), latino_by_pob != "Not Latino") %>% 
+  group_by(latino_by_pob) %>% 
+  count() %>% 
+  mutate(format = "Total")
+
+pobmode1 <- prefread %>% 
+  filter(latino == "Yes") %>% 
   select(formats_used, latino_by_pob) %>% 
-  filter(!is.na(formats_used), !is.na(latino_by_pob)) %>% 
+  filter(!is.na(formats_used), !is.na(latino_by_pob), latino_by_pob != "Not Latino") %>% 
   group_by(formats_used, latino_by_pob) %>% 
   count() %>% 
-  mutate(formats_used = if_else(n <=2, "Other", formats_used)) %>% 
-  filter(formats_used != "Other") %>% 
+  ungroup() %>% 
+  filter(n >= 3) %>% 
   group_by(formats_used, latino_by_pob) %>% 
   summarise(n = sum(n)) %>% 
   ungroup() %>% 
   rename(format = formats_used) %>% 
-  mutate(mode = "used")
+  bind_rows(pobmodedenom) %>% 
+  ungroup() %>% 
+  group_by(latino_by_pob) %>% 
+  calc_shares(group = format, denom = "Total", value = n)
 
-pobmodelatino %>% 
-  filter(latino_by_pob != "Not Latino") %>% 
-  ggplot(aes(x = n, y = reorder(format, n))) +
+pobmode1 %>% 
+  filter(format != "Total") %>% 
+  ggplot(aes(x = share, y = reorder(format, share))) +
   geom_col() +
-  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
-  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
+  geom_text(data = . %>% filter(share >= .15), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
+  geom_text(data = . %>% filter(share < .15), aes(label = scales::percent(share, accuracy = 1)), hjust = -.2) +
   facet_grid(cols = vars(latino_by_pob)) +
-  labs(title = "How Latino respondents get news, by place of birth", subtitle = "Respondents could select multiple ways", x = NULL, y = NULL) +
+  labs(title = "How respondents get news, by age", subtitle = "Respondents could select multiple ways", x = NULL, y = NULL) +
   theme(axis.text.x = element_blank())
 ```
 
 ## Preferred language by age and ethnicity
-
-People under 50 have a slightly stronger overall preference for bilingual content.
 
 ```{r lang_pref_total, fig.height=3}
 pref_all_denom <- read %>% 
@@ -236,85 +281,189 @@ pref_all %>%
         legend.position = "none")
 ```
 
-```{r lang_pref}
+```{r lang_pref_age, fig.height=3}
+pref_age_denom <- read %>% 
+  filter(latino == "Yes") %>% 
+  select(age, tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(age), !is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(age, format) %>% 
+  count() %>% 
+  mutate(language = "Total")
+
 pref_age <- read %>% 
+  filter(latino == "Yes") %>% 
   select(age, tv_video_language, radio_audio_language, print_language) %>% 
   pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
   filter(!is.na(age), !is.na(format), !is.na(language)) %>% 
   mutate(format = str_remove(format, "_language")) %>% 
   group_by(age, format, language) %>% 
-  count()
+  count() %>% 
+  ungroup() %>% 
+  bind_rows(pref_age_denom) %>% 
+  group_by(age, format) %>% 
+  calc_shares(group = language, denom = "Total", value = n) %>% 
+  mutate(format2 = str_replace_all(format, "_", " or "),
+         format2 = str_to_sentence(format2),
+         format2 = if_else(format2 == "Tv or video", "TV or video", format2))
 
 pref_age %>% 
-  filter(!language %in% c("I don't use this format", "Other")) %>% 
-  ggplot(aes(x = n, y = reorder(format, n))) +
-  geom_col() +
-  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
-  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
-  facet_grid(cols = vars(age), rows = vars(language)) +
+  left_join(age_labels, by = "age") %>% 
+  mutate(label = fct_rev(label)) %>% 
+  filter(!language %in% c("I don't use this format", "Other", "Total")) %>% 
+  ggplot(aes(x = share, y = label, group = label)) +
+  geom_point(aes(color = language, shape = format2), size = 4, alpha = .75) +
+  theme_bar(ygrid = T) +
+  scale_y_discrete(expand = expansion(mult = c(0.03, 0.2))) +
+  scale_x_continuous(labels = scales::percent_format()) +
+  theme_bar(xgrid = T,ygrid = T) +
+  scale_color_manual(values = c(cb_pal[1], cb_pal[4], cb_pal[8])) +
+  guides(color = guide_legend(title = "Language"), shape = guide_legend(title = "Format")) +
   labs(title = "Preferred language by mode, by age", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
+  theme(legend.position = "right")
 ```
 
-Language is so important culturally, I'm not at all surprised to see people who identify as Latino strongly preferring Spanish and bilingual content.
 
-```{r pref_ethnicity}
-pref_latino <- read %>% 
-  select(latino, tv_video_language, radio_audio_language, print_language) %>% 
+```{r pref_gender, fig.height=3}
+pref_gender_denom <- read %>% 
+  filter(latino == "Yes") %>% 
+  select(gender, tv_video_language, radio_audio_language, print_language) %>% 
   pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
-  filter(!is.na(latino), !is.na(format), !is.na(language)) %>% 
+  filter(!is.na(gender), !is.na(format), !is.na(language)) %>% 
   mutate(format = str_remove(format, "_language")) %>% 
-  group_by(latino, format, language) %>% 
-  count()
+  group_by(gender, format) %>% 
+  count() %>% 
+  mutate(language = "Total")
 
-pref_latino %>% 
-  filter(!language %in% c("I don't use this format", "Other"), latino != "Opt out") %>% 
-  ggplot(aes(x = n, y = reorder(format, n))) +
-  geom_col() +
-  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
-  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
-  facet_grid(cols = vars(latino), rows = vars(language)) +
-  labs(title = "Preferred language by mode, by ethnicity", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
+pref_gender <- read %>% 
+  select(gender, tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(gender), !is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(gender, format, language) %>% 
+  count() %>% 
+  ungroup() %>% 
+  bind_rows(pref_gender_denom) %>% 
+  group_by(gender, format) %>% 
+  calc_shares(group = language, denom = "Total", value = n) %>% 
+  mutate(format2 = str_replace_all(format, "_", " or "),
+         format2 = str_to_sentence(format2),
+         format2 = if_else(format2 == "Tv or video", "TV or video", format2))
+
+pref_gender %>% 
+  filter(gender != "Transgender & NB", !language %in% c("I don't use this format", "Other", "Total")) %>% 
+  ggplot(aes(x = share, y = gender, group = gender)) +
+  geom_point(aes(color = language, shape = format2), size = 4, alpha = .75) +
+  theme_bar(ygrid = T) +
+  scale_y_discrete(expand = expansion(mult = c(0.03, 0.2))) +
+  scale_x_continuous(labels = scales::percent_format()) +
+  theme_bar(xgrid = T,ygrid = T) +
+  scale_color_manual(values = c(cb_pal[1], cb_pal[4], cb_pal[8])) +
+  guides(color = guide_legend(title = "Language"), shape = guide_legend(title = "Format")) +
+  labs(title = "Preferred language by mode, by gender", x = NULL, y = NULL) +
+  theme(legend.position = "right")
 ```
 
-```{r pref_latino_pob}
+```{r pref_latino_pob, fig.height=3}
+pref_latinopob_denom <- read %>% 
+  select(latino_by_pob, tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(latino_by_pob), !is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(latino_by_pob, format) %>% 
+  count() %>% 
+  mutate(language = "Total")
+
 pref_latinopob <- read %>% 
   select(latino_by_pob, tv_video_language, radio_audio_language, print_language) %>% 
   pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
   filter(!is.na(latino_by_pob), !is.na(format), !is.na(language)) %>% 
   mutate(format = str_remove(format, "_language")) %>% 
   group_by(latino_by_pob, format, language) %>% 
-  count()
+  count() %>% 
+  ungroup() %>% 
+  bind_rows(pref_latinopob_denom) %>% 
+  group_by(latino_by_pob, format) %>% 
+  calc_shares(group = language, denom = "Total", value = n) %>% 
+  mutate(format2 = str_replace_all(format, "_", " or "),
+         format2 = str_to_sentence(format2),
+         format2 = if_else(format2 == "Tv or video", "TV or video", format2))
 
 pref_latinopob %>% 
-  filter(!language %in% c("I don't use this format", "Other"), latino_by_pob != "Not Latino") %>% 
-  ggplot(aes(x = n, y = reorder(format, n))) +
-  geom_col() +
-  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
-  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
-  facet_grid(cols = vars(latino_by_pob), rows = vars(language)) +
-  labs(title = "Preferred language by mode for Latinos, by place of birth", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
+  filter(!language %in% c("I don't use this format", "Other", "Total"), latino_by_pob != "Not Latino") %>% 
+  ggplot(aes(x = share, y = latino_by_pob, group = latino_by_pob)) +
+  geom_point(aes(color = language, shape = format2), size = 4, alpha = .75) +
+  theme_bar(ygrid = T) +
+  scale_y_discrete(expand = expansion(mult = c(0.03, 0.2))) +
+  scale_x_continuous(labels = scales::percent_format()) +
+  theme_bar(xgrid = T,ygrid = T) +
+  scale_color_manual(values = c(cb_pal[1], cb_pal[4], cb_pal[8])) +
+  guides(color = guide_legend(title = "Language"), shape = guide_legend(title = "Format")) +
+  labs(title = "Preferred language by mode, by place of birth", x = NULL, y = NULL) +
+  theme(legend.position = "right")
 ```
+
+```{r pref_langathome, fig.height=3}
+pref_lang_denom <- read %>% 
+  select(home_lang = language, tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(home_lang), !is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(home_lang, format) %>% 
+  count() %>% 
+  mutate(language = "Total")
+
+pref_lang <- read %>% 
+  select(home_lang = language, tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(home_lang), !is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(home_lang, format, language) %>% 
+  count() %>% 
+  ungroup() %>% 
+  bind_rows(pref_lang_denom) %>% 
+  group_by(home_lang, format) %>% 
+  calc_shares(group = language, denom = "Total", value = n) %>% 
+  mutate(format2 = str_replace_all(format, "_", " or "),
+         format2 = str_to_sentence(format2),
+         format2 = if_else(format2 == "Tv or video", "TV or video", format2))
+
+pref_lang %>% 
+  filter(!language %in% c("I don't use this format", "Other", "Total")) %>% 
+  ggplot(aes(x = share, y = home_lang, group = home_lang)) +
+  geom_point(aes(color = language, shape = format2), size = 4, alpha = .75) +
+  theme_bar(ygrid = T) +
+  scale_y_discrete(expand = expansion(mult = c(0.03, 0.2))) +
+  scale_x_continuous(labels = scales::percent_format()) +
+  theme_bar(xgrid = T,ygrid = T) +
+  scale_color_manual(values = c(cb_pal[1], cb_pal[4], cb_pal[8])) +
+  guides(color = guide_legend(title = "Language"), shape = guide_legend(title = "Format")) +
+  labs(title = "Preferred language by mode, by language spoken at home", x = NULL, y = NULL) +
+  theme(legend.position = "right")
+```
+
 
 ## News sources
 
 Preferred sources is also an open text field. Mining for word clouds...
 
 ```{r mine_for_clouds}
-age00_29 <- read %>% filter(age == "age00_29")
+age00_29 <- read %>% filter(latino == "Yes", age == "age00_29")
 age30_49 <- read %>% filter(age == "age30_49")
 age50_99 <- read %>% filter(age == "age50_99")
 
 latino <- read %>% filter(latino == "Yes")
 
-spn_at_home <- read %>% filter(language == "Spanish")
-eng_at_home <- read %>% filter(language == "English")
-both_at_home <- read %>% filter(language == "Both English and Spanish")
+spn_at_home <- read %>% filter(latino == "Yes",language == "Spanish")
+eng_at_home <- read %>% filter(latino == "Yes",language == "English")
+both_at_home <- read %>% filter(latino == "Yes",language == "Both English and Spanish")
 
-fblatino <- read %>% filter(latino_by_pob == "Foreign-born Latino")
-uslatino <- read %>% filter(latino_by_pob == "US-born Latino")
+fblatino <- read %>% filter(latino == "Yes",latino_by_pob == "Foreign-born Latino")
+uslatino <- read %>% filter(latino == "Yes",latino_by_pob == "US-born Latino")
+
+men <- read %>% filter(latino == "Yes", gender == "Man")
+women <- read %>% filter(latino == "Yes", gender == "Woman")
 
 list_age00_29 <- str_split(age00_29$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
 list_age30_49 <- str_split(age30_49$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
@@ -331,6 +480,9 @@ list_fblatino <- str_split(fblatino$open_text_media, ",| y | and | or|\\/|  ", s
 list_uslatino <- str_split(uslatino$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
 
 list_total <- str_split(read$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
+
+list_men <- str_split(men$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
+list_women <- str_split(women$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
 
 clean_clouds <- function(x){
  x %>% 
@@ -350,6 +502,8 @@ g <- tibble(source = c(list_both_at_home)) %>% clean_clouds()
 h <- tibble(source = c(list_fblatino)) %>% clean_clouds()
 i <- tibble(source = c(list_uslatino)) %>% clean_clouds()
 j <- tibble(source = c(list_total)) %>% clean_clouds()
+k <- tibble(source = c(list_men)) %>% clean_clouds()
+l <- tibble(source = c(list_women)) %>% clean_clouds()
 
 cloud_a <- a %>% group_by(source) %>% count()
 cloud_b <- b %>% group_by(source) %>% count()
@@ -361,6 +515,8 @@ cloud_g <- g %>% group_by(source) %>% count()
 cloud_h <- h %>% group_by(source) %>% count()
 cloud_i <- i %>% group_by(source) %>% count()
 cloud_j <- j %>% group_by(source) %>% count()
+cloud_k <- k %>% group_by(source) %>% count()
+cloud_l <- l %>% group_by(source) %>% count()
 ```
 
 By age, young people put fewer answers in, older people put a lot more
@@ -374,22 +530,22 @@ ggplot(cloud_a, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
-  labs(title = "Sources preferred by people under 30")
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by Latinos under 30")
 
 ggplot(cloud_b, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
-  labs(title = "Sources preferred by people 30-49")
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by Latinos 30-49")
 
 ggplot(cloud_c, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
-  labs(title = "Sources preferred by people 50+")
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by Latinos 50+")
 ```
 
 Telemundo far and away the favored source for Latinos
@@ -399,60 +555,78 @@ ggplot(cloud_d, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5])+
   labs(title = "Sources preferred by Latinos")
 ```
 
 Facebook stands out among Spanish speakers
 
-```{r clouds_language}
+```{r clouds_language, fig.width=6}
 ggplot(cloud_e, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
-  labs(title = "Sources preferred by Spanish-speakers at home")
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by Latinos who speak only Spanish at home")
 
 ggplot(cloud_f, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
-  labs(title = "Sources preferred by English-speakers at home")
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by Latinos who speak only English at home")
 
 ggplot(cloud_g, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
-  labs(title = "Sources preferred by bilingual people at home")
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by Latinos who speak English and Spanish at home")
 ```
 
 Foreign-born Latinos use Facebook more (more access to news sources from abroad?)
 
-```{r clouds_latinopob}
+```{r clouds_latinopob, fig.width=6}
 ggplot(cloud_h, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
   labs(title = "Sources preferred by Foreign-born Latinos")
 
 ggplot(cloud_i, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
   labs(title = "Sources preferred by US-born Latinos")
 ```
 
 Total for good measure
 
-```{r clouds_total}
+```{r clouds_total, fig.width=6}
 ggplot(cloud_j, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
   scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
   labs(title = "Sources preferred by all respondents")
+```
+
+Gender
+
+```{r clouds_gender, fig.width=6}
+ggplot(cloud_k, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by Latino men")
+
+ggplot(cloud_l, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by Latinas")
 ```
