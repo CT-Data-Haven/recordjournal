@@ -4,7 +4,7 @@ output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F, warning = F, message = F)
+knitr::opts_chunk$set(echo = F, warning = F, message = F, dpi = 170)
 ```
 
 ```{r libraries}
@@ -13,12 +13,20 @@ library(cwi)
 library(janitor)
 library(camiller)
 source("../utils/plot_utils.R")
+label_col <- c("#EDEEF2")
 ```
 
 ```{r paths}
 path <- "../survey_data/01032023/"
 plot_path <- "../distro/"
-read <- read_csv(paste(path, "clean.csv", sep = ""))
+
+age_labels <- tibble(age = c("age00_29", "age30_49", "age50_99", "Total"),
+                     label = c("Under 30", "30-49", "50 and over", "Total")) %>% 
+  mutate(label = as.factor(label) %>% 
+           fct_relevel(., "Total", "Under 30", "30-49", "50 and over"))
+
+read <- read_csv(paste(path, "clean.csv", sep = "")) %>% 
+  rename(age = big_age_band)
 ```
 
 Current number of respondents (blanks removed) as of January 3, 2023.
@@ -28,8 +36,7 @@ read %>%
   select(survey) %>% 
   group_by(survey) %>% 
   count() %>% 
-  adorn_totals() %>% 
-  knitr::kable()
+  adorn_totals()
 ```
 
 **I'm going to stop disaggregating by survey type so we can focus on disaggregating by other metrics, like age, gender, or nationality**
@@ -37,20 +44,24 @@ read %>%
 ## Age
 
 ```{r age}
+#read %>% select(small_age_band) %>% filter(!is.na(small_age_band)) %>% count()
+
 age <- read %>%
   select(small_age_band) %>% 
   group_by(small_age_band) %>%
   count() %>% 
   ungroup() %>% 
   mutate(small_age_band = as.factor(small_age_band) %>% 
-           fct_relevel(., "Under 18"))
+           fct_relevel(., "Under 18")) %>% 
+  mutate(pct = n / 2028)
 
 age %>%
   filter(!is.na(small_age_band)) %>% 
-  ggplot(aes(x = small_age_band, y = n)) +
+  ggplot(aes(x = small_age_band, y = pct)) +
   geom_col() +
-  geom_text(aes(label = n), vjust = 1.2) +
-  labs(title = "Respondents by age", x = NULL, y = NULL) +
+  geom_text(aes(label = scales::percent(pct, accuracy = 1)), vjust = 1.2, color = label_col) +
+  scale_y_continuous(expand = expansion(mult = c(.01, .1))) +
+  labs(title = "Share of respondents by age group", x = NULL, y = NULL) +
   theme(axis.text.y = element_blank())
 ```
 
@@ -60,54 +71,101 @@ This time around, I'll group ages into 0-29, 30-49, and 50+
 
 Across all age groups, more women than men responding, with greatest disparity in 30-49 range. Keep that in mind as we look at these age-based breakdowns later.
 
-```{r gender}
-#read %>% select(gender) %>% filter(!is.na(gender)) %>% count()
-
-read %>%
-  select(gender) %>% 
-  group_by(gender) %>% 
+```{r eval = F}
+gender_age_totals <- read %>% 
+  select(gender, age) %>% 
+  filter(!is.na(age), !is.na(gender)) %>% 
+  group_by(gender, age) %>% 
   count() %>% 
-  arrange(desc(n)) %>% 
   ungroup() %>% 
-  mutate(share = n / 2043) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>% 
-  knitr::kable()
+  bind_rows(read %>%
+              select(gender, age) %>% 
+              filter(!is.na(age), !is.na(gender)) %>% 
+              select(-age) %>% 
+              mutate(age = "Total") %>% 
+              group_by(gender, age) %>% 
+              count() %>% 
+              ungroup()) %>% 
+  bind_rows(read %>%
+              select(gender, age) %>% 
+              filter(!is.na(age), !is.na(gender)) %>% 
+              select(-gender) %>% 
+              mutate(gender = "Total") %>% 
+              group_by(gender, age) %>% 
+              count() %>% 
+              ungroup()) %>% 
+  add_row(age = "Total", gender = "Total", n = 2005) %>% 
+  group_by(age) %>% 
+  calc_shares(group = gender, denom = "Total", value = n) %>% 
+  mutate(gender = as.factor(gender) %>% 
+           fct_relevel(., "Woman", "Man", "Transgender & NB", "Total"))
 
+gender_age_totals %>% 
+  left_join(age_labels, by = "age") %>% 
+  mutate(label = fct_rev(label)) %>% 
+  filter(!is.na(share)) %>% 
+  ggplot(aes(x = share, y = label, group = gender)) +
+  geom_col(aes(fill = gender), width = .8, position = position_dodge()) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), color = "grey20") +
+  scale_fill_manual(values = c(cb_pal[4], cb_pal[1], cb_pal[8])) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  labs(x = NULL, y = NULL, title = "Respondents by gender and age")
+```
+
+```{r gender}
 gender <- read %>% 
-  select(gender, big_age_band) %>% 
-  group_by(big_age_band, gender) %>% 
+  select(gender, age) %>% 
+  group_by(age, gender) %>% 
   count() %>% 
   ungroup() %>% 
   mutate(gender = as.factor(gender) %>% 
            fct_relevel(., "Woman", "Man", "Transgender & NB"))
-
 gender %>% 
-  filter(!is.na(gender), !is.na(big_age_band), gender != "Opt out") %>% 
-  ggplot(aes(x = big_age_band, y = n, group = gender)) +
+  left_join(age_labels, by = "age") %>% 
+  filter(!is.na(gender), !is.na(age), gender != "Opt out") %>% 
+  ggplot(aes(x = label, y = n, group = gender)) +
   geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
   geom_text(aes(label = n), position = position_dodge(.9), vjust = -.2, color = "grey20") +
-  scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow", "red")])) +
+  scale_fill_manual(values = c(cb_pal[4], cb_pal[1], cb_pal[8])) +
+  guides(fill = guide_legend(title = NULL)) +
+  scale_y_continuous(expand = expansion(mult = c(.01, .1))) +
   theme(legend.position = "bottom",
         axis.text.y = element_blank()) +
-  labs(x = NULL, y = NULL, title = "Respondents by gender and age")
+  labs(x = NULL, y = NULL, title = "Number of respondents by gender and age range")
 ```
 
 ## Town of residence
 
-Someone asked to see the top 5 towns
-
 ```{r}
+library(sf)
+
 town <- read %>%
-  select(residence_town) %>% 
-  group_by(residence_town) %>% 
+  select(name = residence_town) %>% 
+  group_by(name) %>% 
   count()
-  
-town %>% 
-  ggplot(aes(x = n, y = reorder(residence_town, n))) +
-  geom_col() +
-  geom_text(aes(label = n), hjust = 1.2) +
-  labs(title = "Respondents by town of residence", subtitle = "Only top 5 towns shown", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
+
+town_sf <- cwi::town_sf %>% 
+  left_join(town, by = "name") %>% 
+  mutate(brk = cut(n, breaks = c(0, 10, 20, 40, 100, Inf), labels = c("1 to 10", "11 to 20", "21 to 40", "41 to 100", "101 and over"), right = T))
+
+labels_sf <- town_sf %>%
+  mutate(cent = map(geometry, polylabelr::poi),
+         cx = map_dbl(cent, 1),
+         cy = map_dbl(cent, 2),
+         geometry = map2(cx, cy, ~st_point(x = c(.x, .y))) %>%
+           st_sfc() %>%
+           st_geometry()) %>%
+  select(-cent:-cy) %>%
+  st_set_crs(st_crs(town_sf))
+
+ggplot() +
+  geom_sf(data = town_sf %>% filter(is.na(n)), fill = "grey90", size = .25, show.legend = F) +
+  geom_sf(data = town_sf %>% filter(!is.na(n)), aes(fill = brk), size = .25, show.legend = F) +
+  geom_sf_text(data = labels_sf, aes(geometry = geometry, label = scales::comma(n, accuracy = 1)), color = "white", size = 2.75) +
+  coord_sf(ndiscr = 0) +
+  labs(title = "Number of respondents by town of residence", caption = "Not shown: 55 respondents who are not residents of Connecticut", x = NULL, y = NULL) +
+  scale_fill_manual(values = rev(gradient_pal))
 ```
 
 ## Ethnicity x gender x age
@@ -116,12 +174,12 @@ Slightly lower shares of older adults identifying as Latino
 
 ```{r ethnicity}
 gender_age_totals <- read %>% 
-  select(gender, age = big_age_band) %>% 
+  select(gender, age) %>% 
   group_by(gender, age) %>% 
   count()
 
 ethnicity <- read %>% 
-  select(latino, gender, age = big_age_band) %>% 
+  select(latino, gender, age) %>% 
   group_by(latino, gender, age) %>% 
   count() %>% 
   ungroup() %>% 
@@ -131,14 +189,16 @@ ethnicity <- read %>%
   ungroup()
 
 ethnicity %>% 
-  filter(!is.na(share), !is.na(age), latino == "Yes", !is.na(gender), !gender %in% c("Transgender & NB", "Opt out"), !is.na(age)) %>% 
-  ggplot(aes(x = age, y = share, group = gender)) +
-  geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
-  scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow")])) +
-  labs(title = "Share of respondents who identify as Latino/Latina/Latinx", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts") +
-  theme(axis.text.y = element_blank(),
-        legend.position = "bottom")
+  filter(!is.na(share), !is.na(age), latino == "Yes", !is.na(gender), !gender %in% c("Transgender & NB", "Opt out"), !is.na(age))
+  
+  
+  # ggplot(aes(x = age, y = share, group = gender)) +
+  # geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
+  # geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
+  # scale_fill_manual(values = c(cb_pal[4], cb_pal[1])) +
+  # labs(title = "Share of respondents who identify as Latino/Latina/Latinx", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts") +
+  # theme(axis.text.y = element_blank(),
+  #       legend.position = "bottom")
 ```
 
 ## Place of birth x age
@@ -146,83 +206,95 @@ ethnicity %>%
 Younger and older people more likely to be born in the US/PR. I am surprised at the diversity in the 30-49 crowd.
 
 ```{r pob}
+# read %>% select(place_of_birth) %>% 
+#   group_by(place_of_birth) %>% 
+#   count() %>% 
+#   ungroup() %>% 
+#   mutate(share = n / 2043) %>% 
+#   mutate(share = scales::percent(share, accuracy = 1)) %>% 
+#   knitr::kable()
+
 age_totals <- read %>% 
-  select(age = big_age_band) %>% 
+  select(pob = place_of_birth, age) %>% 
+  filter(!is.na(age), !is.na(pob)) %>% 
+  select(-pob) %>% 
   group_by(age) %>% 
   count()
 
-#read %>% select(place_of_birth) %>% filter(!is.na(place_of_birth)) %>% count()
-
-read %>% select(place_of_birth) %>% 
-  group_by(place_of_birth) %>% 
-  count() %>% 
-  ungroup() %>% 
-  mutate(share = n / 2043) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>% 
-  knitr::kable()
-
 pob <- read %>% 
-  select(place_of_birth, age = big_age_band) %>% 
-  group_by(place_of_birth, age) %>% 
+  select(pob = place_of_birth, age) %>% 
+  group_by(pob, age) %>% 
   count() %>% 
   ungroup() %>% 
-  bind_rows(age_totals %>% mutate(place_of_birth = "Total")) %>% 
+  bind_rows(age_totals %>% mutate(pob = "Total")) %>% 
   group_by(age) %>% 
-  calc_shares(group = place_of_birth, denom = "Total", value = n) %>% 
+  calc_shares(group = pob, denom = "Total", value = n) %>% 
   ungroup()
 
 pob %>%
-  filter(!is.na(age)) %>% 
-  mutate(age = as.factor(age) %>% fct_rev()) %>% 
-  ggplot(aes(x = share, y = age, group = age)) +
-  geom_col(aes(fill = place_of_birth), width = .8, position = position_stack(.9)) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
-  guides(fill = guide_legend(title = "Place of birth", reverse = T)) +
-  theme(legend.position = "bottom",
+  left_join(age_labels, by = "age") %>% 
+  mutate(label = fct_rev(label)) %>% 
+  mutate(pob = str_to_title(pob),
+         pob = if_else(pob == "Usa", "USA", pob),
+         pob = as.factor(pob) %>% 
+           fct_relevel(., "USA", "Puerto Rico", "Mexico", "Ecuador", "Other")) %>% 
+  ggplot(aes(x = share, y = label, group = label)) +
+  geom_col(aes(fill = pob), width = .8, position = position_stack(.9)) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5), color = "#EDEEF2") +
+  geom_text(data = . %>% filter(label == "Under 30"), aes(label = pob, color = pob), position = position_stack(.5), vjust = -5.6, size = 3.5) +
+  theme(legend.position = "none",
         axis.text.x = element_blank()) +
-  scale_fill_manual(values = unname(qual_pal[c("pink", "yellow", "teal", "cyan", "violet", "gray")])) +
+  scale_fill_manual(values = gradient_pal) +
+  scale_x_continuous(expand = expansion(mult = c(.01, 0))) +
+  scale_color_manual(values = gradient_pal) +
   labs(x = NULL, y = NULL, title = "Respondents by age and place of birth",
-       caption = "PR and USA may not be mutually exclusive")
+       caption = "Puerto Rico and USA may not be mutually exclusive")
 ```
 
 ## Language spoken at home x age
 
 Pretty even language split among older adults.
 
-```{r lang_at_home}
+```{r fig.width = 5, lang_at_home}
 lang_at_home <- read %>% 
-  select(language, age = big_age_band) %>% 
+  select(language) %>% 
   mutate(language = if_else(is.na(language), "Other", language)) %>% 
-  group_by(age, language) %>%
+  group_by(language) %>%
   count() %>% 
   ungroup() %>% 
-  bind_rows(age_totals %>% mutate(language = "Total")) %>% 
-  group_by(age) %>% 
-  calc_shares(group = language, denom = "Total", value = n) %>% 
+  mutate(share = n / 1961)
+
+lang_at_home2 <- read %>%
+  select(language, age) %>%
+  mutate(language = if_else(is.na(language), "Other", language)) %>%
+  group_by(age, language) %>%
+  count() %>%
+  ungroup() %>%
+  bind_rows(age_totals %>% mutate(language = "Total")) %>%
+  group_by(age) %>%
+  calc_shares(group = language, denom = "Total", value = n) %>%
   ungroup()
 
 #read %>% select(language) %>% filter(!is.na(language)) %>% count()
-
-read %>%
-  select(language) %>% 
-  filter(!is.na(language)) %>%
-  group_by(language) %>% 
-  count() %>% 
-  mutate(share = n / 1961) %>% 
-  mutate(share = scales::percent(share, accuracy = 1)) %>% 
-  knitr::kable()
+# 
+# read %>%
+#   select(language) %>% 
+#   filter(!is.na(language)) %>%
+#   group_by(language) %>% 
+#   count() %>% 
+#   mutate(share = n / 1961) %>% 
+#   mutate(share = scales::percent(share, accuracy = 1)) %>% 
+#   knitr::kable()
 
 lang_at_home %>% 
-  filter(!is.na(age)) %>% 
-  mutate(age = as.factor(age) %>% fct_rev()) %>% 
-  ggplot(aes(x = share, y = age, group = language)) +
-  geom_col(aes(fill = language), width = .8, position = position_stack(.9)) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_stack(.5)) +
-  guides(fill = guide_legend(title = "Language", reverse = T)) +
-  theme(legend.position = "bottom",
-        axis.text.x = element_blank()) +
-  scale_fill_manual(values = unname(qual_pal[c("red", "cyan", "violet", "yellow")])) +
-  labs(x = NULL, y = NULL, title = "Respondents by age and language spoken at home")
+  mutate(language = str_wrap(language, width = 13)) %>% 
+  ggplot(aes(x = share, y = reorder(language, share))) +
+  geom_col(aes(fill = language), width = .8, show.legend = F) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
+  scale_x_continuous(expand = expansion(mult = c(.01, 0))) +
+  theme(axis.text.x = element_blank()) +
+  scale_fill_manual(values = gradient_pal) +
+  labs(x = NULL, y = NULL, title = "Share of respondents by language spoken at home")
 ```
 
 ## Internet-enabled devices and internet at home x age
@@ -231,7 +303,7 @@ I'm kind of shocked at the under-30 lack of device/internet, but not at the nota
 
 ```{r internet}
 internet <- read %>%
-  select(web_at_home, age = big_age_band) %>% 
+  select(web_at_home, age) %>% 
   group_by(web_at_home, age) %>% 
   count() %>% 
   ungroup() %>% 
@@ -240,17 +312,19 @@ internet <- read %>%
   calc_shares(group = web_at_home, denom = "Total", value = n)
 
 internet %>%
-  filter(web_at_home == "No", !is.na(age)) %>% 
-  ggplot(aes(x = age, y = share)) +
-  geom_col(width = .5) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
-  labs(x = NULL, y = NULL, title = "Respondents without internet at home, by age") +
-  theme(axis.text.y = element_blank())
+  filter(web_at_home == "No", !is.na(age))
+
+# 
+#   ggplot(aes(x = age, y = share)) +
+#   geom_col(width = .5) +
+#   geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
+#   labs(x = NULL, y = NULL, title = "Respondents without internet at home, by age") +
+#   theme(axis.text.y = element_blank())
 ```
 
 ```{r device}
 device <- read %>%
-  select(web_device, age = big_age_band) %>% 
+  select(web_device, age) %>% 
   group_by(web_device, age) %>% 
   count() %>% 
   ungroup() %>% 
@@ -259,12 +333,29 @@ device <- read %>%
   calc_shares(group = web_device, denom = "Total", value = n)
 
 device %>%
-  filter(web_device == "No", !is.na(age)) %>% 
-  ggplot(aes(x = age, y = share)) +
-  geom_col(width = .5) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
-  labs(x = NULL, y = NULL, title = "Respondents without an internet-enabled device, by age") +
-  theme(axis.text.y = element_blank())
+  filter(web_device == "No", !is.na(age)) 
+
+# 
+#   ggplot(aes(x = age, y = share)) +
+#   geom_col(width = .5) +
+#   geom_text(aes(label = scales::percent(share, accuracy = 1)), vjust = 1.2) +
+#   labs(x = NULL, y = NULL, title = "Respondents without an internet-enabled device, by age") +
+#   theme(axis.text.y = element_blank())
+```
+
+```{r neither}
+neither <- read %>%
+  select(web_device, web_at_home, age) %>% 
+  mutate(neither = if_else(web_device == "No" & web_at_home == "No", "Neither", "One or both")) %>% 
+  group_by(neither, age) %>% 
+  count() %>% 
+  ungroup() %>%
+  filter(!is.na(neither), !is.na(age)) %>% 
+  bind_rows(age_totals %>% mutate(neither = "Total")) %>% 
+  group_by(age) %>% 
+  calc_shares(group = neither, denom = "Total", value = n)
+
+neither
 ```
 
 ## Registered voter x age x gender
@@ -273,7 +364,7 @@ This is pretty typical nationwide.
 
 ```{r voter}
 voter <- read %>% 
-  select(registered_voter, gender, age = big_age_band) %>% 
+  select(registered_voter, gender, age) %>% 
   group_by(registered_voter, gender, age) %>% 
   count() %>% 
   ungroup() %>% 
@@ -284,11 +375,14 @@ voter <- read %>%
 
 voter %>% 
   filter(!is.na(share), !is.na(age), registered_voter == "Yes", !is.na(gender), !gender %in% c("Transgender & NB", "Opt out"), !is.na(age)) %>% 
-  ggplot(aes(x = age, y = share, group = gender)) +
+  left_join(age_labels, by = "age") %>% 
+  ggplot(aes(x = label, y = share, group = gender)) +
   geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2) +
-  scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow")])) +
-  labs(title = "Share of respondents who are registered to vote", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts") +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), vjust = 1.2, color = label_col) +
+  scale_fill_manual(values = c(cb_pal[4], cb_pal[1])) +
+  labs(title = "Share of respondents who are registered to vote, by gender", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts") +
+  guides(fill = guide_legend(title = NULL)) +
+  scale_y_continuous(expand = expansion(mult = c(.01, 0))) +
   theme(axis.text.y = element_blank(),
         legend.position = "bottom")
   
@@ -300,27 +394,28 @@ Unsurprisingly, half of the students are younger people, middle aged adults have
 
 ```{r person_type}
 person_type <- read %>%
-  select(person_type, age = big_age_band, gender) %>% 
-  group_by(person_type, gender, age) %>% 
+  select(person_type, age) %>% 
+  group_by(person_type, age) %>% 
   count() %>% 
   ungroup() %>% 
-  bind_rows(gender_age_totals %>% mutate(person_type = "Total")) %>% 
-  group_by(age, gender) %>% 
+  bind_rows(age_totals %>% mutate(person_type = "Total")) %>% 
+  group_by(age) %>% 
   calc_shares(group = person_type, denom = "Total", value = n) %>% 
   ungroup()
 
-person_type %>% 
-  mutate(age = as.factor(age) %>% fct_rev()) %>% 
-  filter(!is.na(share), !is.na(age), !is.na(gender), !gender %in% c("Transgender & NB", "Opt out"), person_type != "None of these") %>% 
-  ggplot(aes(x = share, y = age, group = gender)) +
-  geom_col(aes(fill = gender), width = .8, position = position_dodge(.9)) +
-  geom_text(data = . %>% filter(share >= .11), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = 1.2) +
-  geom_text(data = . %>% filter(share < .11), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = -.2, color = "black") +
-  facet_grid(cols = vars(person_type)) +
-  scale_fill_manual(values = unname(qual_pal[c("cyan", "yellow")])) +
-  labs(title = "Share of respondents by person type and gender", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts") +
-  theme(axis.text.x = element_blank(),
-        legend.position = "bottom")
+person_type %>% filter(age != "Total")
+
+# 
+#   ggplot(aes(x = share, y = label)) +
+#   geom_col(width = .8, position = position_dodge(.9)) +
+#   geom_text(data = . %>% filter(share >= .11), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = 1.2, color = label_col) +
+#   geom_text(data = . %>% filter(share < .11), aes(label = scales::percent(share, accuracy = 1)), position = position_dodge(.9), hjust = -.2, color = "black") +
+#   facet_grid(cols = vars(person_type)) +
+#   scale_fill_manual(values = c(cb_pal[4], cb_pal[1])) +
+#   labs(title = "Share of respondents by person type", x = NULL, y = NULL, caption = "Transgender & NB dropped due to low counts") +
+#     guides(fill = guide_legend(title = NULL)) +
+#   theme(axis.text.x = element_blank(),
+#         legend.position = "bottom")
 ```
 
 

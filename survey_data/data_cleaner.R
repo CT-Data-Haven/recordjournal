@@ -80,19 +80,20 @@ x1 <- bind %>%
 #towns
 x2 <- x1 %>%
   mutate(Q19 = str_to_title(Q19)) %>%
-  mutate(Q19 = if_else(!Q19 %in% c("Meriden", "Wallingford", "New Haven", "Waterbury", "Hartford"), "All others", Q19)) %>%
+  mutate(Q19 = if_else(!Q19 %in% cwi::town_sf$name, "All others", Q19)) %>%
+  #mutate(Q19 = if_else(!Q19 %in% c("Meriden", "Wallingford", "New Haven", "Waterbury", "Hartford"), "All others", Q19)) %>%
   rename(residence_town = Q19)
 
 x3 <- x2 %>%
   mutate(Q21 = str_to_upper(Q21)) %>%
   mutate(Q21 = if_else(grepl("PUER|P.R|PR", Q21), "PUERTO RICO", Q21),
          Q21 = if_else(grepl("AMERICA|MERIDEN|US|USA|UNITED|U.S|CT|NEW YORK|EEUU|ESTADO|COUNTY|CHICAGO|CALIFORNIA|NEW HAVEN", Q21), "USA", Q21),
-         Q21 = if_else(grepl("REPUB|DR", Q21), "DOMINICAN REPUBLIC", Q21),
+         #Q21 = if_else(grepl("REPUB|DR", Q21), "DOMINICAN REPUBLIC", Q21),
          Q21 = if_else(grepl("MEX|GUANA", Q21), "MEXICO", Q21),
          Q21 = if_else(grepl("ECUADOR", Q21), "ECUADOR", Q21)) %>%
-  mutate(Q21 = if_else(!Q21 %in% c("USA", "PUERTO RICO", "DOMINICAN REPUBLIC", "ECUADOR", "MEXICO"), "OTHER", Q21)) %>%
+  mutate(Q21 = if_else(!Q21 %in% c("USA", "PUERTO RICO", "ECUADOR", "MEXICO"), "OTHER", Q21)) %>%
   mutate(Q21 = as.factor(Q21),
-         Q21 = fct_relevel(Q21, "USA", "PUERTO RICO", "ECUADOR", "MEXICO", "DOMINICAN REPUBLIC", "OTHER")) %>%
+         Q21 = fct_relevel(Q21, "USA", "PUERTO RICO", "ECUADOR", "MEXICO", "OTHER")) %>%
   rename(place_of_birth = Q21)
 
 x4 <- x3 %>%

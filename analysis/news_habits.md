@@ -30,6 +30,8 @@ are really it.
 People under 50 have a slightly stronger overall preference for
 bilingual content.
 
+![](news_habits_files/figure-gfm/lang_pref_total-1.png)<!-- -->
+
 ![](news_habits_files/figure-gfm/lang_pref-1.png)<!-- -->
 
 Language is so important culturally, I’m not at all surprised to see

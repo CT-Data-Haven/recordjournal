@@ -4,7 +4,7 @@ output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F, warning = F, message = F)
+knitr::opts_chunk$set(echo = F, warning = F, message = F, dpi = 170)
 ```
 
 ```{r libraries}
@@ -13,6 +13,7 @@ library(cwi)
 library(janitor)
 library(camiller)
 source("../utils/plot_utils.R")
+label_col <- c("#EDEEF2")
 ```
 
 ```{r paths}
@@ -37,8 +38,9 @@ modes_a <- read %>%
   filter(formats_used != "Other") %>% 
   group_by(formats_used) %>% 
   summarise(n = sum(n)) %>% 
+  adorn_totals() %>% 
   rename(format = formats_used) %>% 
-  mutate(mode = "used")
+  mutate(mode = "Used")
 
 modes_b <- read %>% 
   select(formats_preferred) %>% 
@@ -50,19 +52,27 @@ modes_b <- read %>%
   filter(formats_preferred != "Other") %>% 
   group_by(formats_preferred) %>% 
   summarise(n = sum(n)) %>% 
+  adorn_totals() %>% 
   rename(format = formats_preferred) %>% 
-  mutate(mode = "preferred")
+  mutate(mode = "Preferred")
 
-mode_bind <- bind_rows(modes_a, modes_b)
+mode_bind <- bind_rows(modes_a, modes_b) %>% 
+  group_by(mode) %>% 
+  calc_shares(group = format, denom = "Total", value = n)
 
 mode_bind %>% 
-  ggplot(aes(x = n, y = reorder(format, n))) +
-  geom_col() +
-  geom_text(data = . %>% filter(n >= 50), aes(label = n), hjust = 1.2) +
-  geom_text(data = . %>% filter(n < 50), aes(label = n), hjust = -.2, color = "black") +
-  facet_grid(cols = vars(mode)) +
-  labs(title = "Ways respondents prefer/use to get news", subtitle = "Respondents could select multiple ways", x = NULL, y = NULL) +
-  theme(axis.text.x = element_blank())
+  filter(!is.na(share)) %>% 
+  ggplot(aes(x = share, y = reorder(format, share)), group = format) +
+  geom_path(color = "grey55", size = 1.5) +
+  geom_point(aes(color = mode, shape = mode), size = 4) +
+  theme_bar(ygrid = T) +
+  ggrepel::geom_text_repel(aes(label = scales::percent(share, accuracy = 1), color = mode), vjust = -1.1, size = 3.4, family = "Barlow Semi Condensed", fontface = "bold") +
+  ggrepel::geom_text_repel(data = . %>% filter(format == "TV"), aes(color = mode, label = mode), size = 3.4, vjust = -3, family = "Barlow Semi Condensed", fontface = "bold", min.segment.length = 1e5) +
+  scale_y_discrete(expand = expansion(mult = c(0.02, 0.2))) +
+  labs(title = "Ways respondents prefer/use to get news", x = NULL, y = NULL) +
+  scale_color_manual(values = c(cb_pal[[1]], cb_pal[[4]])) +
+  theme(axis.text.x = element_blank(),
+        legend.position = "none")
 ```
 
 I expected to see social media top the list for younger people. Social media just ekeing out ahead of TV for 30-49 year olds is interesting. We Milennials love a platform.
@@ -187,6 +197,45 @@ pobmodelatino %>%
 
 People under 50 have a slightly stronger overall preference for bilingual content.
 
+```{r lang_pref_total, fig.height=3}
+pref_all_denom <- read %>% 
+  select(tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(format) %>% 
+  count() %>% 
+  mutate(language = "Total")
+
+pref_all <- read %>% 
+  select(tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(format, language) %>% 
+  count() %>% 
+  ungroup() %>% 
+  bind_rows(pref_all_denom) %>% 
+  group_by(format) %>% 
+  calc_shares(group = language, denom = "Total", value = n) %>% 
+  mutate(format2 = str_replace_all(format, "_", " or "),
+         format2 = str_to_sentence(format2),
+         format2 = if_else(format2 == "Tv or video", "TV or video", format2))
+
+pref_all %>% 
+  filter(!language %in% c("I don't use this format", "Other", "Total")) %>% 
+  ggplot(aes(x = share, y = format2, group = format2)) +
+  geom_point(aes(color = language, shape = language), size = 4) +
+  theme_bar(ygrid = T) +
+  ggrepel::geom_text_repel(aes(label = scales::percent(share, accuracy = 1), color = language), vjust = -1.1, size = 3.4, family = "Barlow Semi Condensed", fontface = "bold") +
+  ggrepel::geom_text_repel(data = . %>% filter(format == "tv_video"), aes(color = language, label = language), size = 3.4, vjust = -3, family = "Barlow Semi Condensed", fontface = "bold", min.segment.length = 1e5) +
+  scale_y_discrete(expand = expansion(mult = c(0.03, 0.2))) +
+  scale_color_manual(values = c(cb_pal[1], cb_pal[4], cb_pal[8])) +
+  labs(title = "Preferred language by mode, all respondents", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank(),
+        legend.position = "none")
+```
+
 ```{r lang_pref}
 pref_age <- read %>% 
   select(age, tv_video_language, radio_audio_language, print_language) %>% 
@@ -286,6 +335,7 @@ list_total <- str_split(read$open_text_media, ",| y | and | or|\\/|  ", simplify
 clean_clouds <- function(x){
  x %>% 
     filter(!is.na(source), source != "") %>% 
+    mutate(source = str_replace_all(source, "ó", "o")) %>% 
     mutate(source = str_to_upper(source)) %>%
     mutate(source = str_trim(source, side = "both")) 
 }
@@ -403,6 +453,6 @@ ggplot(cloud_j, aes(label = source, size = n+3, color = n)) +
   geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
   scale_size_area(max_size = 10) +
   theme_minimal() +
-  scale_color_gradient(high = qual_pal[1], low = qual_pal[7]) +
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
   labs(title = "Sources preferred by all respondents")
 ```

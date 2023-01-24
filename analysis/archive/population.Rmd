@@ -67,11 +67,11 @@ fb <- fetch_fb %>%
   separate(label, into = c("v1", "v2", "v3", "v4", "v5"), fill = "right", sep = "!!") %>%
   filter(!is.na(v3), is.na(v5)) %>% 
   mutate(v4 = if_else(is.na(v4), "Total", v4)) %>% 
-  group_by(year, level, name, v3, v4) %>% 
+  group_by(year, level, name, v4) %>% 
   summarise(estimate = sum(estimate),
             moe = moe_sum(moe = moe, estimate = estimate)) %>% 
   ungroup() %>% 
-  group_by(year, level, name, v3) %>% 
+  group_by(year, level, name) %>% 
   camiller::calc_shares(group = v4, denom = "Total", value = estimate, moe = moe)
 
 fb %>% 
