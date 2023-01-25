@@ -10,37 +10,30 @@ media. I think we can just look at “used.”
 
 I expected to see social media top the list for younger people. Social
 media just ekeing out ahead of TV for 30-49 year olds is interesting. We
-Milennials love a platform.
+Millennials love a platform.
 
 ![](news_habits_files/figure-gfm/modes_age-1.png)<!-- -->
-
-I didn’t expect these to be so similar.
 
 ![](news_habits_files/figure-gfm/mode_lang-1.png)<!-- -->
 
 Huh, I expected more variation here, too. I guess TV and social media
 are really it.
 
-![](news_habits_files/figure-gfm/mode_place_of_birth-1.png)<!-- -->
+![](news_habits_files/figure-gfm/mode_gender-1.png)<!-- -->
 
 ![](news_habits_files/figure-gfm/mode_pob_latino-1.png)<!-- -->
 
 ## Preferred language by age and ethnicity
 
-People under 50 have a slightly stronger overall preference for
-bilingual content.
-
 ![](news_habits_files/figure-gfm/lang_pref_total-1.png)<!-- -->
 
-![](news_habits_files/figure-gfm/lang_pref-1.png)<!-- -->
+![](news_habits_files/figure-gfm/lang_pref_age-1.png)<!-- -->
 
-Language is so important culturally, I’m not at all surprised to see
-people who identify as Latino strongly preferring Spanish and bilingual
-content.
-
-![](news_habits_files/figure-gfm/pref_ethnicity-1.png)<!-- -->
+![](news_habits_files/figure-gfm/pref_gender-1.png)<!-- -->
 
 ![](news_habits_files/figure-gfm/pref_latino_pob-1.png)<!-- -->
+
+![](news_habits_files/figure-gfm/pref_langathome-1.png)<!-- -->
 
 ## News sources
 
@@ -66,3 +59,7 @@ abroad?)
 Total for good measure
 
 ![](news_habits_files/figure-gfm/clouds_total-1.png)<!-- -->
+
+Gender
+
+![](news_habits_files/figure-gfm/clouds_gender-1.png)<!-- -->![](news_habits_files/figure-gfm/clouds_gender-2.png)<!-- -->

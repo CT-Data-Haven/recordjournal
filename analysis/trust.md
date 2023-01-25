@@ -17,7 +17,7 @@ national news sources (Telemundo, etc.) at a higher rate than
 non-Latinos. Again, like social media among older people, I wonder if
 it’s that non-Latinos tend to prefer local news.
 
-![](trust_files/figure-gfm/latino_trust-1.png)<!-- -->
+![](trust_files/figure-gfm/gender_trust-1.png)<!-- -->
 
 Similar trend in people who speak Spanish or both languages at home–
 greater trust in national news sources. People who speak English at home
@@ -41,10 +41,7 @@ adults just think more stuff is relevant to them.
 
 ![](trust_files/figure-gfm/beliefs_age-1.png)<!-- -->
 
-No real dissimilarities here. These probably trend towards general
-totals.
-
-![](trust_files/figure-gfm/beliefs_latino-1.png)<!-- -->
+![](trust_files/figure-gfm/beliefs_gender-1.png)<!-- -->
 
 People who speak Spanish at home are more likely to agree that local
 news reflects their beliefs. I wonder if this is influenced by the fact

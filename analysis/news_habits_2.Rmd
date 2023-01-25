@@ -29,6 +29,7 @@ More than half of respondents who speak Spanish at home are interested in intern
 
 ```{r geos}
 geo_age <- read %>%
+  filter(latino == "Yes") %>% 
   filter(!is.na(age), !is.na(regions_of_interest)) %>%
   select(group = age, region = regions_of_interest) %>% 
   mutate(category = "age") %>% 
@@ -41,12 +42,14 @@ geo_latino <- read %>%
   separate_rows(region, sep = ";")
 
 geo_language <- read %>%
+  filter(latino == "Yes") %>% 
   filter(!is.na(language), !is.na(regions_of_interest)) %>%
   select(group = language, region = regions_of_interest) %>% 
   mutate(category = "language") %>% 
   separate_rows(region, sep = ";")
 
 geo_latinopob <- read %>%
+  filter(latino == "Yes") %>% 
   filter(!is.na(latino_by_pob), !is.na(regions_of_interest)) %>%
   select(group = latino_by_pob, region = regions_of_interest) %>% 
   mutate(category = "latino_by_pob") %>% 
@@ -64,12 +67,12 @@ denoms_geos <- read %>%
   group_by(category, group, region) %>% 
   count()  %>% 
   bind_rows(read %>% 
-  select(age, latino, language, latino_by_pob) %>% 
-  pivot_longer(cols = everything(), names_to = "category", values_to = "group") %>% 
-  group_by(category, group) %>% 
-  count() %>% 
-  filter(!is.na(group), group != "Opt out") %>% 
-  mutate(region = "total"))
+              select(age, latino, language, latino_by_pob) %>% 
+              pivot_longer(cols = everything(), names_to = "category", values_to = "group") %>% 
+              group_by(category, group) %>% 
+              count() %>% 
+              filter(!is.na(group), group != "Opt out") %>% 
+              mutate(region = "total"))
 
 geos <- bind_rows(geo_age, geo_latino, geo_language, geo_latinopob, geo_total) %>% 
   select(category, group, everything()) %>%  
@@ -96,11 +99,12 @@ geos %>%
   filter(!is.na(share), group != "Not Latino") %>% 
   ggplot(aes(x = share, y = fct_rev(group))) +
   geom_col(width = .8) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col, size = 3) +
+  geom_text(data = . %>% filter(share >= .25), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col, size = 3) +
+  geom_text(data = . %>% filter(share < .25), aes(label = scales::percent(share, accuracy = 1)), hjust = -.2, size = 3, color = "black") +
   facet_grid(cols = vars(region), rows = vars(fct_rev(category)), space = "free", scales = "free_y") +
   theme(axis.text.x = element_blank()) +
   labs(title = "Regions of interest by category and group",
-       subtitle = "Regional = New England/NYC Metro", x = NULL, y = NULL)
+       subtitle = "Subgroups other than Latino y/n are Latinos. Regional = New England/NYC Metro", x = NULL, y = NULL)
 ```
 
 ## Topics
@@ -109,18 +113,21 @@ This list is really long, so breaking it out by category for four graphics.
 
 ```{r topics_table}
 top_age <- read %>%
+  filter(latino == "Yes") %>% 
   filter(!is.na(age), !is.na(topics_of_interest)) %>%
   select(group = age, topic = topics_of_interest) %>% 
   mutate(category = "age") %>% 
   separate_rows(topic, sep = ";")
 
-top_latino <- read %>%
-  filter(!is.na(latino), !is.na(topics_of_interest)) %>%
-  select(group = latino, topic = topics_of_interest) %>% 
-  mutate(category = "latino") %>% 
+top_gender <- read %>%
+  filter(latino == "Yes") %>% 
+  filter(!is.na(gender), !is.na(topics_of_interest)) %>%
+  select(group = gender, topic = topics_of_interest) %>%
+  mutate(category = "gender") %>%
   separate_rows(topic, sep = ";")
 
 top_language <- read %>%
+  filter(latino == "Yes") %>% 
   filter(!is.na(language), !is.na(topics_of_interest)) %>%
   select(group = language, topic = topics_of_interest) %>% 
   mutate(category = "language") %>% 
@@ -144,14 +151,15 @@ denoms_tops <- read %>%
   group_by(category, group, topic) %>% 
   count()  %>% 
   bind_rows(read %>% 
-  select(age, latino, language, latino_by_pob) %>% 
-  pivot_longer(cols = everything(), names_to = "category", values_to = "group") %>% 
-  group_by(category, group) %>% 
-  count() %>% 
-  filter(!is.na(group), group != "Opt out") %>% 
-  mutate(topic = "total"))
+              filter(latino == "Yes") %>% 
+              select(age, gender, language, latino_by_pob) %>% 
+              pivot_longer(cols = everything(), names_to = "category", values_to = "group") %>% 
+              group_by(category, group) %>% 
+              count() %>% 
+              filter(!is.na(group), group != "Opt out") %>% 
+              mutate(topic = "total"))
 
-topics <- bind_rows(top_age, top_latino, top_language, top_poblatino, top_total) %>% 
+topics <- bind_rows(top_age, top_gender, top_language, top_poblatino, top_total) %>% 
   select(category, group, everything()) %>%  
   filter(topic != "", !topic == "None") %>% 
   mutate(topic = if_else(grepl("arte|Music", topic), "Music, arts, and culture", topic),
@@ -202,27 +210,41 @@ topics %>%
 I'm really surprised such a small share of young people selected environment/climate change. Music/arts/culture, education, and sports top the list for young people. Health, education, and music/arts/culture for the other two groups.
 
 ```{r top_age}
+age_labels <- tibble(age = c("age00_29", "age30_49", "age50_99", "Total"),
+                     label = c("Under 30", "30-49", "50 and over", "Total")) %>% 
+  mutate(label = as.factor(label) %>% 
+           fct_relevel(., "Total", "Under 30", "30-49", "50 and over"))
+
 topics %>% 
+  left_join(age_labels, by = c("group" = "age")) %>% 
   filter(!is.na(share), category == "age") %>% 
-  ggplot(aes(x = share, y = reorder(topic, share))) +
+  ggplot(aes(x = share, y = reorder(topic, share), group = topic)) +
   geom_col(width = .8) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
-  facet_grid(cols = vars(group)) +
-  theme(axis.text.x = element_blank()) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), color = label_col, hjust = 1.2, size = 3.3) +
+  #geom_point(aes(color = label, shape = label), size = 3, alpha = .75) +
+  #scale_x_continuous(labels = scales::percent_format()) +
+  scale_color_manual(values = c(cb_pal[1], cb_pal[4], cb_pal[8])) +
+  facet_grid(cols = vars(label)) +
+  #theme_bar(xgrid = T, ygrid = T) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
   labs(title = "Topics of interest (by age)", x = NULL, y = NULL)
 ```
 
-Local events standing out among people who don't identify as Latino is interesting.
-
-```{r top_latino}
+```{r top_gender}
 topics %>% 
-  filter(!is.na(share), category == "latino") %>% 
-  ggplot(aes(x = share, y = reorder(topic, share))) +
+  filter(!is.na(share), category == "gender") %>% 
+  ggplot(aes(x = share, y = reorder(topic, share), group = topic)) +
   geom_col(width = .8) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), color = label_col, hjust = 1.2, size = 3.3) +
+  #geom_point(aes(color = group, shape = group), size = 3, alpha = .75) +
+  #scale_x_continuous(labels = scales::percent_format()) +
+  #scale_color_manual(values = c(cb_pal[1], cb_pal[4], cb_pal[8])) +
   facet_grid(cols = vars(group)) +
-  theme(axis.text.x = element_blank()) +
-  labs(title = "Topics of interest (by ethnicity)", subtitle = "Yes/No refers to whether respondent identifies as Latino/Latina/Latinx", x = NULL, y = NULL)
+  #theme_bar(xgrid = T, ygrid = T) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  labs(title = "Topics of interest (by gender)", x = NULL, y = NULL)
 ```
 
 Looks like people who speak English at home also have an interest in local events, otherwise health, education, and music top the lists still, but Spanish-speakers also like to read about sports.
@@ -232,7 +254,7 @@ topics %>%
   filter(!is.na(share), category == "language") %>% 
   ggplot(aes(x = share, y = reorder(topic, share))) +
   geom_col(width = .8) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col, size = 3.5) +
   facet_grid(cols = vars(group)) +
   theme(axis.text.x = element_blank()) +
   labs(title = "Topics of interest (by language spoken at home)", x = NULL, y = NULL)
@@ -245,7 +267,7 @@ topics %>%
   filter(!is.na(share), category == "latino_by_pob", group != "Not Latino") %>% 
   ggplot(aes(x = share, y = reorder(topic, share))) +
   geom_col(width = .8) +
-  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
   facet_grid(cols = vars(group)) +
   theme(axis.text.x = element_blank()) +
   labs(title = "Topics of interest (for Latinos by place of birth)", x = NULL, y = NULL)
@@ -262,10 +284,11 @@ spec_age <- read %>%
   mutate(category = "age") %>% 
   separate_rows(story, sep = ";")
 
-spec_latino <- read %>%
-  filter(!is.na(latino), !is.na(special_stories)) %>%
-  select(group = latino, story = special_stories) %>% 
-  mutate(category = "latino") %>% 
+spec_gender <- read %>%
+  filter(latino == "Yes") %>% 
+  filter(!is.na(gender), !is.na(special_stories)) %>%
+  select(group = gender, story = special_stories) %>% 
+  mutate(category = "gender") %>% 
   separate_rows(story, sep = ";")
 
 spec_language <- read %>%
@@ -292,14 +315,14 @@ denoms_spec <- read %>%
   group_by(category, group, story) %>% 
   count()  %>% 
   bind_rows(read %>% 
-  select(age, latino, language, latino_by_pob) %>% 
+  select(age, gender, language, latino_by_pob) %>% 
   pivot_longer(cols = everything(), names_to = "category", values_to = "group") %>% 
   group_by(category, group) %>% 
   count() %>% 
   filter(!is.na(group), group != "Opt out") %>% 
   mutate(story = "total"))
 
-spec <- bind_rows(spec_age, spec_latino, spec_language, spec_latinopob, spec_total) %>% 
+spec <- bind_rows(spec_age, spec_gender, spec_language, spec_latinopob, spec_total) %>% 
   select(category, group, everything()) %>% 
   mutate(story = str_remove(story, "Topics related to "),
          story = str_remove(story, "Temas acerca de ")) %>% 
@@ -320,7 +343,7 @@ spec <- bind_rows(spec_age, spec_latino, spec_language, spec_latinopob, spec_tot
   group_by(category, group) %>% 
   calc_shares(group = story, denom = "total", value = n) %>% 
   mutate(category = as.factor(category) %>%
-           fct_relevel(., "total", "age", "language", "latino", "latino_by_pob"),
+           fct_relevel(., "total", "age", "language", "gender", "latino_by_pob"),
          group = as.factor(group))
 
 spec %>% 
@@ -328,8 +351,8 @@ spec %>%
   mutate(story = str_wrap(story, 12)) %>% 
   ggplot(aes(x = share, y = fct_rev(group))) +
   geom_col(width = .8) +
-  geom_text(data = . %>% filter(share >= .3), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2) +
-    geom_text(data = . %>% filter(share < .3), aes(label = scales::percent(share, accuracy = 1)), hjust = -.2, color = "black") +
+  geom_text(data = . %>% filter(share >= .3), aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col, size = 3.5) +
+    geom_text(data = . %>% filter(share < .3), aes(label = scales::percent(share, accuracy = 1)), hjust = -.2, color = "black", size = 3.5) +
   facet_grid(cols = vars(story), rows = vars(fct_rev(category)), space = "free", scales = "free_y") +
   theme(axis.text.x = element_blank()) +
   labs(title = "Stories of interest by category and group", x = NULL, y = NULL)

@@ -26,10 +26,7 @@ for the other two groups.
 
 ![](news_habits_2_files/figure-gfm/top_age-1.png)<!-- -->
 
-Local events standing out among people who don’t identify as Latino is
-interesting.
-
-![](news_habits_2_files/figure-gfm/top_latino-1.png)<!-- -->
+![](news_habits_2_files/figure-gfm/top_gender-1.png)<!-- -->
 
 Looks like people who speak English at home also have an interest in
 local events, otherwise health, education, and music top the lists
