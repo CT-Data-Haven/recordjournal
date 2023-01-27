@@ -1,0 +1,352 @@
+---
+title: "Misc breakdowns"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F, dpi = 170, fig.height = 3)
+```
+
+```{r libraries}
+library(tidyverse)
+library(cwi)
+library(janitor)
+library(camiller)
+source("../utils/plot_utils.R")
+label_col <- c("#EDEEF2")
+```
+
+```{r paths}
+path <- "../survey_data/01032023/"
+plot_path <- "../distro/"
+
+age_labels <- tibble(age = c("age00_29", "age30_49", "age50_99", "Total"),
+                     label = c("Under 30", "30-49", "50 and over", "Total")) %>% 
+  mutate(label = as.factor(label) %>% 
+           fct_relevel(., "Total", "Under 30", "30-49", "50 and over"))
+
+read <- read_csv(paste(path, "clean.csv", sep = "")) %>% 
+  rename(age = big_age_band)
+```
+
+## Parents
+
+```{r counts_parents}
+parents <- read %>% 
+  filter(person_type == "Parent")
+
+parents %>% count() #803
+
+parents %>% 
+  filter(!is.na(language)) %>% 
+  group_by(language) %>% 
+  count() #335 bilingual, 135 english, 314 spanish
+
+parents %>% 
+  filter(!is.na(gender)) %>% 
+  group_by(gender) %>% 
+  count() #299 man, 501 women
+
+parents %>% 
+  filter(!is.na(latino_by_pob)) %>% 
+  group_by(latino_by_pob) %>% 
+  count() # 435 fb latino, 251 us latino, 99 not latino
+
+parents %>% 
+  filter(!is.na(web_device)) %>% 
+  group_by(web_device) %>% 
+  count() #54 no, 739 yes
+
+parents %>% 
+  filter(!is.na(web_at_home)) %>% 
+  group_by(web_at_home) %>% 
+  count() #44 no, 752 yes
+
+parents %>%
+  filter(web_device == "No", web_at_home == "No") %>% 
+  count() #neither 18
+```
+
+```{r lang_parents}
+pref_parents_denom <- parents %>% 
+  select(tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(format) %>% 
+  count() %>% 
+  mutate(language = "Total")
+
+pref_parents <- parents %>% 
+  select(tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(format, language) %>% 
+  count() %>% 
+  ungroup() %>% 
+  bind_rows(pref_parents_denom) %>% 
+  group_by(format) %>% 
+  calc_shares(group = language, denom = "Total", value = n) %>% 
+  mutate(format2 = str_replace_all(format, "_", " or "),
+         format2 = str_to_sentence(format2),
+         format2 = if_else(format2 == "Tv or video", "TV or video", format2))
+
+pref_parents %>% 
+  filter(!language %in% c("I don't use this format", "Other", "Total")) %>% 
+  ggplot(aes(x = share, y = format2, group = format2)) +
+  geom_point(aes(color = language, shape = language), size = 4) +
+  theme_bar(ygrid = T) +
+  ggrepel::geom_text_repel(aes(label = scales::percent(share, accuracy = 1), color = language), vjust = -1.1, size = 3.4, family = "Barlow Semi Condensed", fontface = "bold") +
+  ggrepel::geom_text_repel(data = . %>% filter(format == "tv_video"), aes(color = language, label = language), size = 3.4, vjust = -3, family = "Barlow Semi Condensed", fontface = "bold", min.segment.length = 1e5) +
+  scale_y_discrete(expand = expansion(mult = c(0.03, 0.2))) +
+  scale_color_manual(values = c(cb_pal[1], cb_pal[4], cb_pal[8])) +
+  labs(title = "Preferred language by mode, parents", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank(),
+        legend.position = "none")
+```
+
+```{r cloud_parents, fig.height=4}
+list_parents <- str_split(parents$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
+
+clean_clouds <- function(x){
+ x %>% 
+    filter(!is.na(source), source != "") %>% 
+    mutate(source = str_replace_all(source, "ó", "o")) %>% 
+    mutate(source = str_to_upper(source)) %>%
+    mutate(source = str_trim(source, side = "both")) 
+}
+
+a <- tibble(source = c(list_parents)) %>% clean_clouds()
+
+cloud_a <- a %>% group_by(source) %>% count()
+
+library(ggwordcloud)
+
+set.seed(13)
+
+ggplot(cloud_a, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by Parents")
+```
+
+```{r parent_trust}
+trust_p <- parents %>% select(trust_national_news, trust_local_news, trust_social_media_news, trust_news_from_social_circle) %>% 
+  pivot_longer(cols = starts_with("trust"), names_to = "level", names_prefix = "trust_", values_to = "response") %>% 
+  mutate(level = str_replace_all(level, "_", " "),
+         level = str_to_sentence(level)) %>% 
+  mutate(response = if_else(response == "Not at all", response, "Some or a lot")) %>% 
+  filter(!is.na(response)) %>% 
+  group_by(level, response) %>% 
+  count() %>% 
+  pivot_wider(id_cols = c("level"), names_from = "response", values_from = "n") %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(Total = sum(`Some or a lot`, `Not at all`)) %>% 
+  pivot_longer(cols = c("Some or a lot", "Not at all", "Total"), names_to = "response", values_to = "n") %>%
+  mutate(response = as.factor(response) %>% fct_relevel(., "Some or a lot", "Not at all")) %>% 
+  group_by(level) %>% 
+  calc_shares(group = response, denom = "Total", value = n)
+
+trust_p %>% 
+  filter(response == "Some or a lot") %>% 
+  ggplot(aes(x = share, y = reorder(level, share))) +
+  geom_col(width = .8) +
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank()) +
+  labs(title = "Some or a lot of trust in different sources of news, parents", x = NULL, y = NULL)
+```
+
+```{r parent_belief}
+beliefs_p <- parents %>% 
+  select(trust_sources_of_news_about_my_community, local_news_covers_issues_important_to_me, local_news_reflects_my_beliefs_and_values) %>% 
+  pivot_longer(cols = c("trust_sources_of_news_about_my_community", "local_news_covers_issues_important_to_me", "local_news_reflects_my_beliefs_and_values"), names_to = "question", values_to = "response") %>% 
+   mutate(question = str_replace_all(question, "_", " "),
+         question = str_replace(question, "trust", "I trust"),
+         question = str_to_sentence(question)) %>% 
+  filter(!is.na(response)) %>% 
+  group_by(question, response) %>% 
+  count() %>% 
+  pivot_wider(id_cols = c("question"), names_from = "response", values_from = "n") %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(Total = sum(Neutral, Agree, Disagree)) %>% 
+  pivot_longer(cols = c("Neutral", "Agree", "Disagree", "Total"), names_to = "response", values_to = "n") %>%
+  group_by(question) %>% 
+  calc_shares(group = response, denom = "Total", value = n) %>% 
+  ungroup() %>% 
+  mutate(response = as.factor(response) %>% fct_relevel(., "Agree", "Neutral", "Disagree"))
+
+beliefs_p %>% 
+  mutate(response = fct_rev(response)) %>% 
+  mutate(question = str_wrap(question, 26)) %>% 
+  filter(response == "Agree") %>% 
+  ggplot(aes(x = share, y = reorder(question, share))) +
+  geom_col(width = .8) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank()) +
+  labs(title = "Share of parents who agree with statements about local news", x = NULL, y = NULL)
+```
+
+## Students
+
+```{r count_students}
+students <- read %>% 
+  filter(person_type == "Student")
+
+students %>% count() #235
+
+students %>% 
+  filter(!is.na(language)) %>% 
+  group_by(language) %>% 
+  count() #121 bilingual, 61 english, 45 spanish
+
+students %>% 
+  filter(!is.na(gender)) %>% 
+  group_by(gender) %>% 
+  count() #81 men, 7 transgender, 143 women
+
+students %>% 
+  filter(!is.na(latino_by_pob)) %>% 
+  group_by(latino_by_pob) %>% 
+  count() #57 fb latino, 133 us latino, 38 not latino
+
+students %>% 
+  filter(!is.na(web_device)) %>% 
+  group_by(web_device) %>% 
+  count() #4 no, 229 yes
+
+students %>% 
+  filter(!is.na(web_at_home)) %>% 
+  group_by(web_at_home) %>% 
+  count() #5 no, 228 yes
+
+students %>%
+  filter(web_device == "No", web_at_home == "No") %>% 
+  count() #neither 2
+
+#trust, beliefs, language prefs, word cloud
+```
+
+```{r lang_student}
+pref_stu_denom <- students %>% 
+  select(tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(format) %>% 
+  count() %>% 
+  mutate(language = "Total")
+
+pref_stu <- students %>% 
+  select(tv_video_language, radio_audio_language, print_language) %>% 
+  pivot_longer(cols = ends_with("language"), names_to = "format", values_to = "language") %>% 
+  filter(!is.na(format), !is.na(language)) %>% 
+  mutate(format = str_remove(format, "_language")) %>% 
+  group_by(format, language) %>% 
+  count() %>% 
+  ungroup() %>% 
+  bind_rows(pref_stu_denom) %>% 
+  group_by(format) %>% 
+  calc_shares(group = language, denom = "Total", value = n) %>% 
+  mutate(format2 = str_replace_all(format, "_", " or "),
+         format2 = str_to_sentence(format2),
+         format2 = if_else(format2 == "Tv or video", "TV or video", format2))
+
+pref_stu %>% 
+  filter(!language %in% c("I don't use this format", "Other", "Total")) %>% 
+  ggplot(aes(x = share, y = format2, group = format2)) +
+  geom_point(aes(color = language, shape = language), size = 4) +
+  theme_bar(ygrid = T) +
+  ggrepel::geom_text_repel(aes(label = scales::percent(share, accuracy = 1), color = language), vjust = -1.1, size = 3.4, family = "Barlow Semi Condensed", fontface = "bold") +
+  ggrepel::geom_text_repel(data = . %>% filter(format == "tv_video"), aes(color = language, label = language), size = 3.4, vjust = -3, family = "Barlow Semi Condensed", fontface = "bold", min.segment.length = 1e5) +
+  scale_y_discrete(expand = expansion(mult = c(0.03, 0.2))) +
+  scale_color_manual(values = c(cb_pal[1], cb_pal[4], cb_pal[8])) +
+  labs(title = "Preferred language by mode, students", x = NULL, y = NULL) +
+  theme(axis.text.x = element_blank(),
+        legend.position = "none")
+```
+
+```{r cloud_student, fig.height=4}
+list_students <- str_split(students$open_text_media, ",| y | and | or|\\/|  ", simplify = T)
+
+b <- tibble(source = c(list_students)) %>% clean_clouds()
+
+cloud_b <- b %>% group_by(source) %>% count()
+
+ggplot(cloud_b, aes(label = source, size = n+3, color = n)) +
+  geom_text_wordcloud_area(family = "Barlow Semi Condensed", eccentricity = .6) +
+  scale_size_area(max_size = 10) +
+  theme_minimal() +
+  scale_color_gradient(high = gradient_pal[1], low = gradient_pal[5]) +
+  labs(title = "Sources preferred by students")
+```
+
+```{r trust_s}
+trust_s <- students %>% select(trust_national_news, trust_local_news, trust_social_media_news, trust_news_from_social_circle) %>% 
+  pivot_longer(cols = starts_with("trust"), names_to = "level", names_prefix = "trust_", values_to = "response") %>% 
+  mutate(level = str_replace_all(level, "_", " "),
+         level = str_to_sentence(level)) %>% 
+  mutate(response = if_else(response == "Not at all", response, "Some or a lot")) %>% 
+  filter(!is.na(response)) %>% 
+  group_by(level, response) %>% 
+  count() %>% 
+  pivot_wider(id_cols = c("level"), names_from = "response", values_from = "n") %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(Total = sum(`Some or a lot`, `Not at all`)) %>% 
+  pivot_longer(cols = c("Some or a lot", "Not at all", "Total"), names_to = "response", values_to = "n") %>%
+  mutate(response = as.factor(response) %>% fct_relevel(., "Some or a lot", "Not at all")) %>% 
+  group_by(level) %>% 
+  calc_shares(group = response, denom = "Total", value = n)
+
+trust_s %>% 
+  filter(response == "Some or a lot") %>% 
+  ggplot(aes(x = share, y = reorder(level, share))) +
+  geom_col(width = .8) +
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank()) +
+  labs(title = "Some or a lot of trust in different sources of news, students", x = NULL, y = NULL)
+```
+
+```{r student_belief}
+beliefs_s <- students %>% 
+  select(trust_sources_of_news_about_my_community, local_news_covers_issues_important_to_me, local_news_reflects_my_beliefs_and_values) %>% 
+  pivot_longer(cols = c("trust_sources_of_news_about_my_community", "local_news_covers_issues_important_to_me", "local_news_reflects_my_beliefs_and_values"), names_to = "question", values_to = "response") %>% 
+   mutate(question = str_replace_all(question, "_", " "),
+         question = str_replace(question, "trust", "I trust"),
+         question = str_to_sentence(question)) %>% 
+  filter(!is.na(response)) %>% 
+  group_by(question, response) %>% 
+  count() %>% 
+  pivot_wider(id_cols = c("question"), names_from = "response", values_from = "n") %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(Total = sum(Neutral, Agree, Disagree)) %>% 
+  pivot_longer(cols = c("Neutral", "Agree", "Disagree", "Total"), names_to = "response", values_to = "n") %>%
+  group_by(question) %>% 
+  calc_shares(group = response, denom = "Total", value = n) %>% 
+  ungroup() %>% 
+  mutate(response = as.factor(response) %>% fct_relevel(., "Agree", "Neutral", "Disagree"))
+
+beliefs_s %>% 
+  mutate(response = fct_rev(response)) %>% 
+  mutate(question = str_wrap(question, 26)) %>% 
+  filter(response == "Agree") %>% 
+  ggplot(aes(x = share, y = reorder(question, share))) +
+  geom_col(width = .8) +
+  geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col) +
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank()) +
+  labs(title = "Share of students who agree with statements about local news", x = NULL, y = NULL)
+```
