@@ -252,6 +252,7 @@ Looks like people who speak English at home also have an interest in local event
 ```{r top_language}
 topics %>% 
   filter(!is.na(share), category == "language") %>% 
+  mutate(group = str_wrap(group, 13)) %>% 
   ggplot(aes(x = share, y = reorder(topic, share))) +
   geom_col(width = .8) +
   geom_text(aes(label = scales::percent(share, accuracy = 1)), hjust = 1.2, color = label_col, size = 3.5) +
